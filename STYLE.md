@@ -1,0 +1,1 @@
+Here you can document your coding standards and conventions. This includes decisions about naming, style guides, etc.
