@@ -55,7 +55,7 @@ B <--> C
 ---
 title: Draft Database Objects
 ---
-
+erDiagram
     User {
         int user_id
         string name
