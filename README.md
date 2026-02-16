@@ -111,7 +111,7 @@ graph TD;
     Validate_Data -->|Valid| Play_Game[Go to Game];
     Validate_Data -->|Invalid| Error_Message[/Error Message/];
     Play_Game --> Finish_Game[Finish Game];
-    Finish_Game --> Update_Score[Update Score(If new high score)]
+    Finish_Game --> Update_Score[Update Score];
     Update_Score --> End([End]);
     Error_Message --> End;
 ```
