@@ -4,7 +4,7 @@ Please fill out this document to reflect your team's project. This is a living d
 
 Also, be sure to check out the Wiki for information on how to maintain your team's requirements.
 
-## TeamName
+## Team 3A
 
 <!--The name of your team.-->
 
@@ -12,13 +12,13 @@ Also, be sure to check out the Wiki for information on how to maintain your team
 
 <!--A one paragraph summary of what the software will do.-->
 
-This is an example paragraph written in markdown. You can use *italics*, **bold**, and other formatting options. You can also <u>use inline html</u> to format your text. The example sections included in this document are not necessarily all the sections you will want, and it is possible that you won't use all the one's provided. It is your responsibility to create a document that adequately conveys all the information about your project specifications and requirements.
-
-Please view this file's source to see `<!--comments-->` with guidance on how you might use the different sections of this document. 
+Project description provided by course staff:  Players will navigate Fred the Fish through a series of underwater obstacles, using simple keyboard controls, where points are awarded the longer obstacles are avoided. Your task will include designing the game mechanics and creating ASCII art representations of the undersea environment  ([here]("https://github.com/schromya/FroggySecurity/blob/main/demo.gif") is an example of basic command-line ASCII art). Additionally, you will implement player accounts which enables a leaderboard system where players can view and compete for top scores.
 
 ### Customer
 
 <!--A brief description of the customer for this software, both in general (the population who might eventually use such a system) and specifically for this document (the customer(s) who informed this document). Every project will have a customer from the CS506 instructional staff. Requirements should not be derived simply from discussion among team members. Ideally your customer should not only talk to you about requirements but also be excited later in the semester to use the system.-->
+
+The customers for this software would be people who would want a fun game to play, and people who want to compete against others and their own scores.
 
 ### Specification
 
@@ -30,66 +30,10 @@ Please view this file's source to see `<!--comments-->` with guidance on how you
 
 #### Technology Stack
 
-Here are some sample technology stacks that you can use for inspiration:
-
 ```mermaid
 flowchart RL
 subgraph Front End
-	A(Javascript: React)
-end
-	
-subgraph Back End
-	B(Python: Django with \nDjango Rest Framework)
-end
-	
-subgraph Database
-	C[(MySQL)]
-end
-
-A <-->|"REST API"| B
-B <-->|Django ORM| C
-```
-
-```mermaid
-flowchart RL
-subgraph Front End
-	A(Javascript: Vue)
-end
-	
-subgraph Back End
-	B(Python: Flask)
-end
-	
-subgraph Database
-	C[(MySQL)]
-end
-
-A <-->|"REST API"| B
-B <-->|SQLAlchemy| C
-```
-
-```mermaid
-flowchart RL
-subgraph Front End
-	A(Javascript: Vue)
-end
-	
-subgraph Back End
-	B(Javascript: Express)
-end
-	
-subgraph Database
-	C[(MySQL)]
-end
-
-A <-->|"REST API"| B
-B <--> C
-```
-
-```mermaid
-flowchart RL
-subgraph Front End
-	A(Static JS, CSS, HTML)
+	A(Command Line)
 end
 	
 subgraph Back End
@@ -100,71 +44,30 @@ subgraph Database
 	C[(MySQL)]
 end
 
-A <-->|HTTP| B
+A <--> B
 B <--> C
 ```
-
-```mermaid
-flowchart RL
-subgraph Front End
-	A(Mobile App)
-end
-	
-subgraph Back End
-	B(Python: Django)
-end
-	
-subgraph Database
-	C[(MySQL)]
-end
-
-A <-->|REST API| B
-B <-->|Django ORM| C
-```
-
 
 
 #### Database
 
 ```mermaid
 ---
-title: Sample Database ERD for an Order System
+title: Draft Database Objects
 ---
 erDiagram
-    Customer ||--o{ Order : "placed by"
-    Order ||--o{ OrderItem : "contains"
-    Product ||--o{ OrderItem : "included in"
-
-    Customer {
-        int customer_id PK
+    User {
+        int user_id
         string name
-        string email
-        string phone
+        string password
+        int high_score
     }
 
-    Order {
-        int order_id PK
-        int customer_id FK
-        string order_date
-        string status
-    }
-
-    Product {
-        int product_id PK
-        string name
-        string description
-        decimal price
-    }
-
-    OrderItem {
-        int order_item_id PK
-        int order_id FK
-        int product_id FK
-        int quantity
-    }
 ```
 
 #### Class Diagram
+
+WIP
 
 ```mermaid
 ---
@@ -202,19 +105,20 @@ classDiagram
 title: Sample Program Flowchart
 ---
 graph TD;
-    Start([Start]) --> Input_Data[/Input Data/];
-    Input_Data --> Process_Data[Process Data];
-    Process_Data --> Validate_Data{Validate Data};
-    Validate_Data -->|Valid| Process_Valid_Data[Process Valid Data];
+    Start([Start]) --> Login[/Login/];
+    Login --> Get_Data[Get Data];
+    Get_Data --> Validate_Data{Validate Data};
+    Validate_Data -->|Valid| Play_Game[Go to Game];
     Validate_Data -->|Invalid| Error_Message[/Error Message/];
-    Process_Valid_Data --> Analyze_Data[Analyze Data];
-    Analyze_Data --> Generate_Output[Generate Output];
-    Generate_Output --> Display_Output[/Display Output/];
-    Display_Output --> End([End]);
+    Play_Game --> Finish_Game[Finish Game];
+    Finish_Game --> Update_Score[Update Score];
+    Update_Score --> End([End]);
     Error_Message --> End;
 ```
 
 #### Behavior
+
+WIP
 
 ```mermaid
 ---
@@ -231,6 +135,8 @@ stateDiagram
 ```
 
 #### Sequence Diagram
+
+WIP
 
 ```mermaid
 sequenceDiagram
