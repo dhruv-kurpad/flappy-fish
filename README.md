@@ -33,7 +33,7 @@ The customers for this software would be people who would want a fun game to pla
 ```mermaid
 flowchart RL
 subgraph Front End
-	A(Static JS, CSS, HTML)
+	A(Command Line)
 end
 	
 subgraph Back End
@@ -44,7 +44,7 @@ subgraph Database
 	C[(MySQL)]
 end
 
-A <-->|HTTP| B
+A <--> B
 B <--> C
 ```
 
@@ -66,6 +66,8 @@ erDiagram
 ```
 
 #### Class Diagram
+
+WIP
 
 ```mermaid
 ---
@@ -103,19 +105,20 @@ classDiagram
 title: Sample Program Flowchart
 ---
 graph TD;
-    Start([Start]) --> Input_Data[/Input Data/];
-    Input_Data --> Process_Data[Process Data];
-    Process_Data --> Validate_Data{Validate Data};
-    Validate_Data -->|Valid| Process_Valid_Data[Process Valid Data];
+    Start([Start]) --> Login[/Login/];
+    Login --> Get_Data[Get Data];
+    Get_Data --> Validate_Data{Validate Data};
+    Validate_Data -->|Valid| Play_Game[Go to Game];
     Validate_Data -->|Invalid| Error_Message[/Error Message/];
-    Process_Valid_Data --> Analyze_Data[Analyze Data];
-    Analyze_Data --> Generate_Output[Generate Output];
-    Generate_Output --> Display_Output[/Display Output/];
-    Display_Output --> End([End]);
+    Play_Game --> Finish_Game[Finish Game];
+    Finish_Game --> Update_Score[Update Score(If new high score)]
+    Update_Score --> End([End]);
     Error_Message --> End;
 ```
 
 #### Behavior
+
+WIP
 
 ```mermaid
 ---
@@ -132,6 +135,8 @@ stateDiagram
 ```
 
 #### Sequence Diagram
+
+WIP
 
 ```mermaid
 sequenceDiagram
