@@ -1,14 +1,11 @@
-def login_user(username, password):
-    
-    # USE this function to send the HTTP request to spring boot
+import requests
 
-    
-    # The below code is just for testing and to give an example of how itd work
-    if username == "admin" and password == "password":
-        return {"success": True, "message": "Login successful!"}
-    else:
-        return {"success": False, "message": "Invalid login details!"}
+BASE_URL = "http://localhost:8080/api/players"
 
 def register_user(username, password):
-    # Registration logic function
-    return {"success": True, "message": "User registered successfully!"}
+    r = requests.get(f"{BASE_URL}/register", params={"name": username, "pwd": password})
+    return {"success": (r.status_code == 200), "message": r.text}
+
+def login_user(username, password):
+    r = requests.get(f"{BASE_URL}/all")
+    return {"success": (r.status_code == 200), "message": "Connected to Spring Boot!" if r.status_code==200 else r.text}
