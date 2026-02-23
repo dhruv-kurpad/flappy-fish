@@ -1,12 +1,13 @@
 import sys
-from auth import login_user
+from auth import login_user, register_user
 
 
 # Display Menu
 def show_menu():
     print("\n=== FLAPPY BIRD ===")
     print("1. Login")
-    print("2. Exit")
+    print("2. Register")
+    print("3. Exit")
     return input("Select an option: ")
 
 # Core game logic function
@@ -33,8 +34,20 @@ def main():
                 start_game(username)
             else:
                 print(f"Error: {result['message']}")
-
+                
         elif choice == "2":
+            username = input("New Username: ")
+            password = input("New Password: ")
+
+            result = register_user(username, password)
+
+            if result["success"]:
+                print(result["message"])
+            else:
+                print(f"Error: {result['message']}")
+
+
+        elif choice == "3":
             print("Goodbye!")
             sys.exit()
         else:
