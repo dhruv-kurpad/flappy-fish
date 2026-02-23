@@ -1,0 +1,32 @@
+services:
+  mysql-db:
+    image: mysql:8.0.45
+    container_name: mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: project3a_db
+    ports:
+      - "3306:3306"
+    volumes:
+      - project_3a_db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    container_name: springboot-app-dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    profiles:
+      - dev
+
+volumes:
+  project_3a_db_data:
