@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y dos2unix \
 RUN ./gradlew clean bootJar -x test
 
 # ---------- Stage 2: Run ----------
-FROM eclipse-temurin:21-jdk
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 # Fix for Windows users
@@ -38,4 +38,3 @@ EXPOSE 8080
 
 # Default: run the JAR
 CMD ["java", "-jar", "app.jar"]
-
