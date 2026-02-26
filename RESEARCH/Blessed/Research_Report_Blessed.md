@@ -82,6 +82,6 @@ One last thing to note is that before drawing the new screen each time, make sur
 
 <!--list your sources and link them to a footnote with the source url-->
 
-[blessed resources](https://blessed.readthedocs.io/en/latest/index.html)
-[blessed keyboard input](https://blessed.readthedocs.io/en/latest/keyboard.html)
+- [blessed resources](https://blessed.readthedocs.io/en/latest/index.html)
+- [blessed keyboard input](https://blessed.readthedocs.io/en/latest/keyboard.html)
 
