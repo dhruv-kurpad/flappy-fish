@@ -1,40 +1,15 @@
-# ---------- Stage 1: Build ----------
-FROM eclipse-temurin:21-jdk AS build
+# Build stage: use Gradle image
+FROM gradle:9-jdk21 AS builder
 WORKDIR /app
 
-RUN apt update && apt install -y findutils
-
-# Copy Gradle wrapper and build files
-COPY gradlew .
-COPY gradle gradle
 COPY build.gradle .
 COPY settings.gradle .
-COPY application.properties .
-COPY application-test.properties .
+COPY src src
+RUN gradle bootJar --no-daemon
 
-# Copy source code
-COPY src ./src
-
-# Fix for Windows users
-RUN apt-get update && apt-get install -y dos2unix \
-   && dos2unix gradlew \
-   && chmod +x gradlew
-
-# Build the JAR (skip tests for faster builds)
-RUN ./gradlew clean bootJar -x test
-
-# ---------- Stage 2: Run ----------
-FROM eclipse-temurin:21-jre
+# Run stage: only the JAR and runtime
+FROM eclipse-temurin:21-jdk-jammy
 WORKDIR /app
-
-# Fix for Windows users
-RUN apt-get update && apt-get install -y dos2unix
-
-# Copy built JAR from build stage
-COPY --from=build /app/build/libs/*.jar app.jar
-
-# Expose port
+COPY --from=builder /app/build/libs/*-SNAPSHOT.jar app.jar
 EXPOSE 8080
-
-# Default: run the JAR
-CMD ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

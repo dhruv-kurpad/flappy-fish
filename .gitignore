@@ -1,2 +1,86 @@
+############################################
+# OS Files
+############################################
 .DS_Store
-*.zip
+Thumbs.db
+
+############################################
+# IDE / Editor
+############################################
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+
+############################################
+# Logs
+############################################
+*.log
+
+############################################
+# Java / Spring Boot
+############################################
+*.class
+*.jar
+*.war
+*.ear
+
+# Build output folders
+target/
+build/
+out/
+.gradle/
+
+############################################
+# Maven Wrapper (keep wrapper jar)
+############################################
+!.mvn/wrapper/maven-wrapper.jar
+
+############################################
+# Node / Frontend
+############################################
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+.parcel-cache/
+.vite/
+.next/
+.nuxt/
+.svelte-kit/
+
+############################################
+# Environment Variables / Secrets
+############################################
+.env
+.env.*
+!.env.example
+
+application-local.yml
+application-local.properties
+application-dev.yml
+application-dev.properties
+application-prod.yml
+application-prod.properties
+
+############################################
+# Database (Local Data Only)
+############################################
+mysql_data/
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+############################################
+# Docker
+############################################
+docker-compose.override.yml
+
+############################################
+# Temporary Files
+############################################
+*.tmp
+*.temp
