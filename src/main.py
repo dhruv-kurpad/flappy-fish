@@ -19,39 +19,42 @@ def start_game(username):
     input("\nGame Over! Press Enter to return to menu...")
 
 def main():
-    while True:
-        choice = show_menu()
+    try:
+        while True:
+            choice = show_menu()
 
-        if choice == "1":
-            username = input("Username: ")
-            password = input("Password: ")
+            if choice == "1":
+                username = input("Username: ")
+                password = input("Password: ")
 
-            # Call to external module
-            result = login_user(username, password)
+                # Call to external module
+                result = login_user(username, password)
 
-            if result["success"]:
-                print(result["message"])
-                start_game(username)
+                if result["success"]:
+                    print(result["message"])
+                    start_game(username)
+                else:
+                    print(f"Error: {result['message']}")
+
+            elif choice == "2":
+                username = input("New Username: ")
+                password = input("New Password: ")
+
+                result = register_user(username, password)
+
+                if result["success"]:
+                    print(result["message"])
+                else:
+                    print(f"Error: {result['message']}")
+
+            elif choice == "3":
+                print("Goodbye!")
+                sys.exit()
             else:
-                print(f"Error: {result['message']}")
-                
-        elif choice == "2":
-            username = input("New Username: ")
-            password = input("New Password: ")
-
-            result = register_user(username, password)
-
-            if result["success"]:
-                print(result["message"])
-            else:
-                print(f"Error: {result['message']}")
-
-
-        elif choice == "3":
-            print("Goodbye!")
-            sys.exit()
-        else:
-            print("Invalid choice, try again.")
+                print("Invalid choice, try again.")
+    except (KeyboardInterrupt, EOFError):
+        print("\nExiting...")
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()
