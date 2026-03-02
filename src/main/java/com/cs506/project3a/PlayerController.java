@@ -1,8 +1,14 @@
 package com.cs506.project3a;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/players")
@@ -30,5 +36,33 @@ public class PlayerController {
     @GetMapping("/all")
     public List<Player> getAllPlayers() {
         return playerRepository.findAll();
+    }
+
+    // Endpoint to validate login credentials
+    // Example: /api/players/login?name=user1&pwd=abc
+    @GetMapping("/login")
+    public Map<String, Object> login(@RequestParam String name, @RequestParam String pwd) {
+        Optional<Player> player = playerRepository.findByUsername(name);
+
+        if (player.isEmpty()) {
+            return Map.of(
+                    "success", false,
+                    "message", "Login Failed: Username not found."
+            );
+        }
+
+        if (!player.get().getPassword().equals(pwd)) {
+            return Map.of(
+                    "success", false,
+                    "message", "Login Failed: Incorrect password."
+            );
+        }
+
+        return Map.of(
+                "success", true,
+                "message", "Login successful!",
+                "username", player.get().getUsername(),
+                "playerId", player.get().getId()
+        );
     }
 }
