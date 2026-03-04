@@ -1,5 +1,5 @@
 import sys
-from auth import login_user, register_user
+from auth import login_user, register_user, remove_user
 
 
 # Display Menu
@@ -8,6 +8,7 @@ def show_menu():
     print("1. Login")
     print("2. Register")
     print("3. Exit")
+    print("DEBUG: 4. Remove User")
     return input("Select an option: ")
 
 # Core game logic function
@@ -50,6 +51,16 @@ def main():
             elif choice == "3":
                 print("Goodbye!")
                 sys.exit()
+            elif choice == "4":
+                print("Removing user...")
+                username = input("Username to remove: ")
+                result = remove_user(username)
+
+
+                if result["success"]:
+                    print(result["message"])
+                else:
+                    print(f"Error: {result['message']}")
             else:
                 print("Invalid choice, try again.")
     except (KeyboardInterrupt, EOFError):

@@ -37,3 +37,21 @@ def login_user(username, password):
         "success": bool(data.get("success")),
         "message": data.get("message", "Login request completed."),
     }
+
+def remove_user(username):
+    try:
+        response = requests.get(
+            f"{BASE_URL}/remove",
+            params={"name": username},
+            timeout=5,
+        )
+        response.raise_for_status()
+    except requests.RequestException:
+        return {"success": False, "message": "Cannot connect to Spring Boot backend."}
+
+
+    message = response.text
+    return {
+        "success": "User removed successfully!" in message,
+        "message": message,
+    }
