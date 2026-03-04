@@ -22,7 +22,7 @@ Thumbs.db
 # Java / Spring Boot
 ############################################
 *.class
-*.jar
+#*.jar
 *.war
 *.ear
 
