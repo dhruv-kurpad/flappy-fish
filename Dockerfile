@@ -1,5 +1,15 @@
+# Build stage: use Gradle image
+FROM gradle:9-jdk21 AS builder
+WORKDIR /app
+
+COPY build.gradle .
+COPY settings.gradle .
+COPY src src
+RUN gradle bootJar --no-daemon
+
+# Run stage: only the JAR and runtime
 FROM eclipse-temurin:21-jdk-jammy
 WORKDIR /app
-COPY build/libs/*-SNAPSHOT.jar app.jar
+COPY --from=builder /app/build/libs/*-SNAPSHOT.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]

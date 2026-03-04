@@ -14,6 +14,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    networks:
+      - appnet
 
   app:
     build: .
@@ -27,6 +29,13 @@ services:
       - SPRING_PROFILES_ACTIVE=dev
     profiles:
       - dev
+    networks:
+      - appnet
+    restart: on-failure
 
 volumes:
   project_3a_db_data:
+
+networks:
+  appnet:
+    driver: bridge
