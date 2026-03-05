@@ -6,18 +6,15 @@
 
 ### Problem Description
 
-Whenever I would run the command ```docker compose --profile dev up -d --build``` it wouldn't fully setup Spring Boot. After doing ```docker ps``` it just shows that the Spring Boot container is constantly restarting and never fully connecting.
+There was a weird infinite looping issue whenever I ran the program in GitBash using the command ```py src/main.py``. The issue only happened in GitBash, any other terminal was fine.
 
 ### Problem Resolution
 
-I added, with the help from copilot, 4 lines to the ```compose.yml``` file.
-```SPRING_DATASOURCE_URL``` points Spring to the MySQL container hostname on the Docker network.
-```SPRING_DATASOURCE_USERNAME``` and ```SPRING_DATASOURCE_PASSWORD``` provide credentials matching the MySQL service
-```SPRING_DATASOURCE_DRIVER_CLASS_NAME``` ensures the MySQL driver is selected
-```SPRING_JPA_HIBERNATE_DOL_AUTO=update``` lets Hibernate initialize/update schema so the app can fully boot
+After research, I found that there was a weird connection issue with windows and GitBash where the programs weren't running correctly. I found that adding ```winpty``` before the command fixed the problem.
+
+New Command: ```winpty py src/main.py```
 
 ### Sources
 
 - Copilot
-- Postman AI assistant
 
