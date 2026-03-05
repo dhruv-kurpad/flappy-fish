@@ -65,4 +65,16 @@ public class PlayerController {
                 "playerId", player.get().getId()
         );
     }
+
+    //Remove a User for testing purposes
+    @GetMapping("/remove")
+    public String removeUser(@RequestParam String name){
+        Optional<Player> player = playerRepository.findByUsername(name);
+        if(player.isEmpty()){
+            return "No user with username '" + name + "' found.";
+        }
+        playerRepository.delete(player.get());
+        return "User '" + name + "' removed successfully.";
+    }
+
 }
