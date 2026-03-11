@@ -13,14 +13,12 @@ class Project3aApplicationTests {
 	@Test
 	void addUserTest() {
 		//Adds first user
-		Player testUser = new Player("WittyName", "password");
-		pc.register(testUser);
-		assert(pc.getUserByName("WittyName") == testUser.getUsername());
+		pc.register("WittyName", "password");
+		assert(pc.login("WittyName", "password").get("message").equals("Login successful!"));
 
         //Adds second user
-		Player nextUser = new Player("newName", "1234");
-		pc.register(nextUser);
-		assert(pc.getUserByName("newName") == nextUser.getUsername());
+		pc.register("newName", "1234");
+		assert(pc.login("newName", "1234").get("message").equals("Login successful!"));
 
 		//removes both
          pc.removeUser("WittyName");
@@ -34,13 +32,11 @@ class Project3aApplicationTests {
 	@Test
 	void sameUserTest() {
 		//Tests if same object uploaded twice
-		Player testUser = new Player("WittyName", "password");
-		pc.register(testUser);
-		assert(pc.register(testUser).equals("Registration Failed: Username 'WittyName' is already taken."));
+		pc.register("WittyName", "password");
+		assert(pc.register("WittyName", "password").equals("Registration Failed: Username 'WittyName' is already taken."));
 
         //Checks if same name diff password is still correctly rejected
-        Player sameName = new Player("WittyName", "badPass");
-		assert(pc.register(sameName).equals("Registration Failed: Username 'WittyName' is already taken."));
+		assert(pc.register("WittyName", "badPass").equals("Registration Failed: Username 'WittyName' is already taken."));
 
 		 pc.removeUser("WittyName");
 
@@ -49,11 +45,9 @@ class Project3aApplicationTests {
 	@Test
 	void samePasswordTest(){
 
-		Player testUser = new Player("WittyName", "password");
-		Player newUser = new Player("NewName", "password");
-		pc.register(testUser);
-		assert(pc.register(newUser)== "Registration Successful! Player ID: " + newUser.getId());
-		assert(pc.getUserByName("NewName") == testUser.getUsername());
+		pc.register("WittyName", "password");
+		assert(pc.register("NewName", "password")== "Registration Successful! Player ID: " + newUser.getId());
+		assert(pc.login("NewName", "password").get("message").equals("Login successful!"));
        
 	     pc.removeUser("WittyName");
 	     pc.removeUser("newName");
@@ -66,9 +60,8 @@ class Project3aApplicationTests {
 	void emptyUserTest() {
 
 		//Tests that both the registration fxn reports an error and the database is unaffected
-		Player testUser = new Player("", "password");
-		assert(pc.register(testUser).equals("Registration Failed: Username can not be empty."));
-		assert(pc.getAllPlayers == NULL);
+		assert(pc.register("", "password").equals("Registration Failed: Username can not be empty."));
+		assert(pc.login("", "password").get("message").equals("Login Failed: Username not found."));
 
 	}
 
@@ -77,9 +70,8 @@ class Project3aApplicationTests {
 	void emptyPasswordTest() {
 
 		//Tests that both the registration fxn reports an error and the database is unaffected
-		Player testUser = new Player("WittyName", "");
-		assert(pc.register(testUser).equals("Registration Failed: Password can not be empty."));
-		assert(pc.getAllPlayers == NULL);
+		assert(pc.register("WittyName", "").equals("Registration Failed: Password can not be empty."));
+		assert(pc.login("WittyName", "").get("message").equals("Login Failed: Username not found."));
 	}
 
 }
