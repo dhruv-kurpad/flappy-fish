@@ -1,6 +1,10 @@
 from typing import List, Tuple
 from abc import ABC, abstractmethod
 
+# GameObject Class, abstract base class for all game objects
+# Properties:
+# - position: Tuple[int, int] (x and y coordinates of the object)
+# - sprite: List[List[str]] (2D array representing the visual representation of the object)
 class GameObject(ABC):
     @property
     def position(self) -> Tuple[int, int]:
