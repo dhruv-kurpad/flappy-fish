@@ -1,0 +1,86 @@
+#####################################
+############### Setup ###############
+#####################################
+stages:
+  - lint
+  - unit_test
+  - build
+  - release
+
+before_script:
+  - dos2unix ./gradlew || echo "dos2unix not installed, skipping"
+  - chmod +x ./gradlew
+
+#####################################
+############## Linting ##############
+#####################################
+lint_backend:
+  stage: lint
+  image: eclipse-temurin:21-jdk
+  script:
+    - ./gradlew checkstyleMain
+  artifacts:
+    paths:
+      - build/reports/checkstyle/
+  tags:
+    - cs506
+
+#####################################
+############## Testing ##############
+#####################################
+unit_test_backend:
+  stage: unit_test
+  image: eclipse-temurin:21-jdk
+  script:
+    - ./gradlew clean test
+  coverage: '/COVERAGE: ([0-9]{1,3}%)/'
+  tags:
+    - cs506
+  artifacts:
+    when: always
+    reports:
+      junit: build/test-results/test/TEST-*.xml
+      coverage_report:
+        coverage_format: jacoco
+        path: build/reports/jacoco/test/jacocoTestReport.xml
+    paths:
+      - build/reports/tests/test/
+      - build/reports/jacoco/
+
+#####################################
+############### Build ###############
+#####################################
+build:
+  stage: build
+  image: eclipse-temurin:21-jdk
+  script:
+    - ./gradlew clean build -x test
+    - ls build/libs
+  artifacts:
+    paths:
+      - build/libs/*.jar
+  tags:
+    - cs506
+  only:
+    - main
+
+#####################################
+############## Release ##############
+#####################################
+release:
+  stage: release
+  image: docker:20.10.16
+  services:
+    - docker:20.10.16-dind
+  variables:
+    RELEASE_TAG: release-$CI_PIPELINE_IID
+  script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - docker build --file release.dockerfile -t $CI_REGISTRY_IMAGE/backend:$RELEASE_TAG .
+    - docker tag $CI_REGISTRY_IMAGE/backend:$RELEASE_TAG $CI_REGISTRY_IMAGE/backend:latest
+    - docker push $CI_REGISTRY_IMAGE/backend:$RELEASE_TAG
+    - docker push $CI_REGISTRY_IMAGE/backend:latest
+  tags:
+    - cs506
+  only:
+    - main
