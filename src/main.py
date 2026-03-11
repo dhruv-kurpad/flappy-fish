@@ -1,5 +1,6 @@
 import sys
 from auth import login_user, register_user, remove_user
+from game_logic import start_game_logic
 
 
 # Display Menu
@@ -16,7 +17,8 @@ def start_game(username):
     print(f"\nWelcome, {username}!")
     print("--- GAME STARTING ---")
     print(" (control options) ")
-    # Flappy Bird logic 
+    # Flappy Bird logic
+    start_game_logic(username)
     input("\nGame Over! Press Enter to return to menu...")
 
 def main():
@@ -61,6 +63,12 @@ def main():
                     print(result["message"])
                 else:
                     print(f"Error: {result['message']}")
+
+            # TESTING CODE
+            elif choice == "5":
+                start_game("TEST USER")
+            # TESTING CODE
+
             else:
                 print("Invalid choice, try again.")
     except (KeyboardInterrupt, EOFError):
@@ -69,3 +77,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
