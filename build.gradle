@@ -57,7 +57,6 @@ tasks.named('test') {
     finalizedBy jacocoTestReport
 }
 
-<<<<<<< HEAD
 tasks.named('asciidoctor') {
     inputs.dir snippetsDir
     dependsOn test
@@ -102,5 +101,3 @@ jacocoTestReport {
     finalizedBy printJacocoCoverage
 }
 
-=======
->>>>>>> kcb/pipeline_setup
