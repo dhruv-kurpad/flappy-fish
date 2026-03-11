@@ -36,7 +36,7 @@ class Project3aApplicationTests {
 		//Tests if same object uploaded twice
 		Player testUser = new Player("WittyName", "password");
 		pc.register(testUser);
-		assert(pc.register(testUser).equals("Registration Failed: Username 'WittyName' is already taken."))
+		assert(pc.register(testUser).equals("Registration Failed: Username 'WittyName' is already taken."));
 
         //Checks if same name diff password is still correctly rejected
         Player sameName = new Player("WittyName", "badPass");
@@ -53,7 +53,7 @@ class Project3aApplicationTests {
 		Player newUser = new Player("NewName", "password");
 		pc.register(testUser);
 		assert(pc.register(newUser)== "Registration Successful! Player ID: " + newUser.getId());
-		assert(pc.getUserByName("NewName") == testUser.getUsername())
+		assert(pc.getUserByName("NewName") == testUser.getUsername());
        
 	     pc.removeUser("WittyName");
 	     pc.removeUser("newName");
