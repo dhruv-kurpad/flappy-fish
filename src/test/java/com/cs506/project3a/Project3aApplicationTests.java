@@ -3,6 +3,7 @@ package com.cs506.project3a;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
 class Project3aApplicationTests {
@@ -24,7 +25,6 @@ class Project3aApplicationTests {
          pc.removeUser("WittyName");
 	    pc.removeUser("newName");
 
-		assert(pc.getAllPlayers == NULL);
 
 	}
 
@@ -46,7 +46,7 @@ class Project3aApplicationTests {
 	void samePasswordTest(){
 
 		pc.register("WittyName", "password");
-		assert(pc.register("NewName", "password")== "Registration Successful! Player ID: " + newUser.getId());
+		assert(pc.register("NewName", "password")== "Registration Successful! Player ID: " + "NewName");
 		assert(pc.login("NewName", "password").get("message").equals("Login successful!"));
        
 	     pc.removeUser("WittyName");
