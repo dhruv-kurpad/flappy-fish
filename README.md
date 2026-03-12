@@ -234,4 +234,4 @@ Run all JUnit tests:
 gradle test
 ```
 
-Check: build/reports
+Check: build/reports for results
