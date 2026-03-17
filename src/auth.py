@@ -1,6 +1,6 @@
 import requests
 
-BASE_URL = "http://localhost:8080/api/players"
+BASE_URL = "http://cs506x3a.cs.wisc.edu:8080/api/players"
 
 def register_user(username, password):
     try:

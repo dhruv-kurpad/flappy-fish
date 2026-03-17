@@ -170,21 +170,17 @@ deactivate DjangoBackend
 ### Running the Backend and MySQL (Local Docker)
 Start the stack:
 
-```bash
-docker compose --profile dev up -d
-```
+The backend and MySQL run on the course VM. Use this base URL for the API:
 
-- Spring Boot API: `http://localhost:8080`
-- MySQL: `localhost:3306`, database `project3a_db`, user `root` / `root`
 
-Helpful API calls:
+Example API calls:
 
 ```bash
 # Register a player
-curl "http://localhost:8080/api/players/register?name=string&pwd=string"
+    curl "http://cs506x3a.cs.wisc.edu:8080/api/players/register?name=string&pwd=string"
 
 # List players
-curl "http://localhost:8080/api/players/all"
+     curl "http://cs506x3a.cs.wisc.edu:8080/api/players/all"
 ```
 
 Stop the stack:
@@ -199,13 +195,7 @@ docker compose --profile dev down
 
 The backend and MySQL can also run on the course VM `cs506x3a.cs.wisc.edu`.
 
-Open an SSH tunnel from your laptop:
-
-   ```bash
-   ssh -L 8080:localhost:8080 cslogin@cs506x3a.cs.wisc.edu
-   ```
-
-   Leave this session open.
+Connect to the campus vpn to use
 
 All players are stored in the MySQL DB on `cs506x3a`, so everyone sees the same data.
 
