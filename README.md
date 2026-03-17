@@ -162,3 +162,76 @@ deactivate DjangoBackend
 
 <!--This is a link to a seperate coding conventions document / style guide-->
 [Style Guide & Conventions](STYLE.md)
+
+---
+
+### Getting Started
+
+### Running the Backend and MySQL (Local Docker)
+Start the stack:
+
+```bash
+docker compose --profile dev up -d
+```
+
+- Spring Boot API: `http://localhost:8080`
+- MySQL: `localhost:3306`, database `project3a_db`, user `root` / `root`
+
+Helpful API calls:
+
+```bash
+# Register a player
+curl "http://localhost:8080/api/players/register?name=string&pwd=string"
+
+# List players
+curl "http://localhost:8080/api/players/all"
+```
+
+Stop the stack:
+
+```bash
+docker compose --profile dev down
+```
+
+---
+
+### Using the Shared VM Database (cs506x3a)
+
+The backend and MySQL can also run on the course VM `cs506x3a.cs.wisc.edu`.
+
+Open an SSH tunnel from your laptop:
+
+   ```bash
+   ssh -L 8080:localhost:8080 cslogin@cs506x3a.cs.wisc.edu
+   ```
+
+   Leave this session open.
+
+All players are stored in the MySQL DB on `cs506x3a`, so everyone sees the same data.
+
+---
+
+### Python Client / Game
+Set up a virtual environment and install dependencies:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r src/requirements.txt
+```
+
+Run the game:
+
+```bash
+python src/main.py
+```
+
+### Testing
+
+Run all JUnit tests:
+
+```bash
+gradle test
+```
+
+Check: build/reports for results
