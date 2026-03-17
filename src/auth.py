@@ -55,3 +55,30 @@ def remove_user(username):
         "success": "User removed successfully!" in message,
         "message": message,
     }
+
+def get_leaderboard():
+    try:
+        response = requests.get(
+            f"{BASE_URL}/leaderboard",
+            timeout=5,
+        )
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException:
+        return {
+            "success": False,
+            "message": "Cannot connect to Spring Boot backend.",
+            "players": []
+        }
+    except ValueError:
+        return {
+            "success": False,
+            "message": "Invalid response from backend.",
+            "players": []
+        }
+
+    return {
+        "success": True,
+        "message": "Leaderboard loaded successfully.",
+        "players": data
+    }
