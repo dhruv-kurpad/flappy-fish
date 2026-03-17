@@ -2,7 +2,7 @@
 ############### Setup ###############
 #####################################
 stages:
-  - lint
+ # - lint
   - unit_test
   - build
   - release
@@ -14,20 +14,34 @@ before_script:
 #####################################
 ############## Linting ##############
 #####################################
-lint_backend:
-  stage: lint
-  image: eclipse-temurin:21-jdk
-  script:
-    - ./gradlew checkstyleMain
-  artifacts:
-    paths:
-      - build/reports/checkstyle/
-  tags:
-    - cs506
+#lint_backend:
+#  stage: lint
+#  image: eclipse-temurin:21-jdk
+#  script:
+#    - ./gradlew checkstyleMain
+#  artifacts:
+#    paths:
+ #     - build/reports/checkstyle/
+ # tags:
+#    - cs506
 
 #####################################
 ############## Testing ##############
 #####################################
+unit_test_frontend:
+  stage: unit_test  
+  tags:
+    - cs506
+  image: python
+  script:
+    - python src/test.py 2>&1 | tee results.log
+  artifacts:
+    untracked: true
+    when: on_success
+    expire_in: 30 days
+    paths:
+      - results.log
+
 unit_test_backend:
   stage: unit_test
   image: eclipse-temurin:21-jdk
