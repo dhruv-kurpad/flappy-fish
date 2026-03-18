@@ -27,6 +27,12 @@ public class PlayerController {
    */
   @GetMapping("/register")
   public int register(@RequestParam String name, @RequestParam String pwd) {
+    if (name == null || name.isBlank()) {
+      return -2;
+    }
+    if (pwd == null || pwd.isBlank()) {
+      return -3;
+    }
     if (playerRepository.findByUsername(name).isPresent()) {
       return -1;
     }

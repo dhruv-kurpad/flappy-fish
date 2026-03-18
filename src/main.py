@@ -73,6 +73,10 @@ def handle_register_code(code, username):
         print("Registration Successful!")
     elif code == -1:
         print(f"Error: Registration Failed: Username '{username}' is already taken.")
+    elif code == -2:
+        print("Error: Registration Failed: Username cannot be empty.")
+    elif code == -3:
+        print("Error: Registration Failed: Password cannot be empty.")
     else:
         print("Error: Cannot connect to backend.")
 
