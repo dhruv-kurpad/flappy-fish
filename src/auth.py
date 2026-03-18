@@ -11,13 +11,9 @@ def register_user(username, password):
         )
         response.raise_for_status()
     except requests.RequestException:
-        return {"success": False, "message": "Cannot connect to Spring Boot backend."}
+        return {"code": -99}
 
-    message = response.text
-    return {
-        "success": "Registration Successful!" in message,
-        "message": message,
-    }
+    return {"code": int(response.text)}
 
 def login_user(username, password):
     try:
@@ -29,14 +25,11 @@ def login_user(username, password):
         response.raise_for_status()
         data = response.json()
     except requests.RequestException:
-        return {"success": False, "message": "Cannot connect to Spring Boot backend."}
+        return {"code": -99}
     except ValueError:
-        return {"success": False, "message": "Invalid response from backend."}
+        return {"code": -99}
 
-    return {
-        "success": bool(data.get("success")),
-        "message": data.get("message", "Login request completed."),
-    }
+    return data
 
 def remove_user(username):
     try:
@@ -47,11 +40,6 @@ def remove_user(username):
         )
         response.raise_for_status()
     except requests.RequestException:
-        return {"success": False, "message": "Cannot connect to Spring Boot backend."}
+        return {"code": -99}
 
-
-    message = response.text
-    return {
-        "success": "User removed successfully!" in message,
-        "message": message,
-    }
+    return {"code": int(response.text)}

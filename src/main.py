@@ -21,6 +21,46 @@ def start_game(username):
     start_game_logic(username)
     input("\nGame Over! Press Enter to return to menu...")
 
+# Input validation
+def validate_credentials(username, password):
+    if not username.strip():
+        print("Error: Username cannot be empty.")
+        return False
+    if " " in username:
+        print("Error: Username cannot contain spaces.")
+        return False
+    if not password.strip():
+        print("Error: Password cannot be empty.")
+        return False
+    return True
+
+# Code handlers for string responses
+def handle_register_code(code, username):
+    if code == 0:
+        print("Registration Successful!")
+    elif code == -1:
+        print(f"Error: Registration Failed: Username '{username}' is already taken.")
+    else:
+        print("Error: Cannot connect to backend.")
+
+def handle_login_code(code):
+    if code == 0:
+        print("Login successful!")
+    elif code == -1:
+        print("Error: Login Failed: Username not found.")
+    elif code == -2:
+        print("Error: Login Failed: Incorrect password.")
+    else:
+        print("Error: Cannot connect to backend.")
+
+def handle_remove_code(code, username):
+    if code == 0:
+        print(f"User '{username}' removed successfully.")
+    elif code == -1:
+        print(f"Error: No user with username '{username}' found.")
+    else:
+        print("Error: Cannot connect to backend.")
+
 def main():
     try:
         while True:
@@ -30,39 +70,41 @@ def main():
                 username = input("Username: ")
                 password = input("Password: ")
 
+                if not validate_credentials(username, password):
+                    continue
+
                 # Call to external module
                 result = login_user(username, password)
+                code = result["code"]
 
-                if result["success"]:
-                    print(result["message"])
+                handle_login_code(code)
+
+                if code == 0:
                     start_game(username)
-                else:
-                    print(f"Error: {result['message']}")
 
             elif choice == "2":
                 username = input("New Username: ")
                 password = input("New Password: ")
 
-                result = register_user(username, password)
+                if not validate_credentials(username, password):
+                    continue
 
-                if result["success"]:
-                    print(result["message"])
-                else:
-                    print(f"Error: {result['message']}")
+                result = register_user(username, password)
+                code = result["code"]
+
+                handle_register_code(code, username)
 
             elif choice == "3":
                 print("Goodbye!")
                 sys.exit()
+
             elif choice == "4":
                 print("Removing user...")
                 username = input("Username to remove: ")
                 result = remove_user(username)
+                code = result["code"]
 
-
-                if result["success"]:
-                    print(result["message"])
-                else:
-                    print(f"Error: {result['message']}")
+                handle_remove_code(code, username)
 
             # TESTING CODE
             elif choice == "5":
@@ -77,4 +119,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
