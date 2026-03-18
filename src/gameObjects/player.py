@@ -1,4 +1,6 @@
 from gameObjects.game_object import GameObject
+from gameObjects.sprite_translator import generate_sprite
+from pathlib import Path
 
 # Player Class, inherits from GameObject
 # Properties:
@@ -7,12 +9,8 @@ from gameObjects.game_object import GameObject
 class Player(GameObject):
     def __init__(self, x: int, y: int):
         self._position = (x, y)
-        self._sprite = [
-            ["\\", ";", ",", " ", " ", " ", " ", ",", ";", "\\", "\\", ",", ";", " ", " "],
-            [" ", "\\", "\\", "\\", ";", ";", ":", ":", ":", ":", ":", ":", ":", "o", " "],
-            [" ", "/", "/", "/", ";", ";", ":", ":", ":", ":", ":", ":", ":", ":", "<"],
-            ["/", ";", "'", " ", '"', "/", "/", "/", "/", "/", "'", "'", " ", " ", " "]
-        ]
+        sprite_path = Path(__file__).resolve().parent.parent / "assets" / "fish.txt"
+        self._sprite = generate_sprite(str(sprite_path))
 
     @property
     def sprite(self):

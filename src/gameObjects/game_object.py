@@ -18,6 +18,7 @@ class GameObject(ABC):
     def width(self) -> int:
         return len(self.sprite[0]) if self.sprite else 0
     
+    @property
     def height(self) -> int:
         return len(self.sprite) if self.sprite else 0
     
