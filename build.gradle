@@ -19,7 +19,7 @@ checkstyle {
 }
 
 bootJar {
-    mainClass = 'com.cs506.tutorial.TutorialApplication'
+    mainClass = 'com.cs506.project3a.Project3aApplication'
 }
 
 group = 'com.cs506'
