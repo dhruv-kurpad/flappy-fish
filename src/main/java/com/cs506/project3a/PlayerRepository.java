@@ -13,13 +13,16 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
   /**
    * Find a player by their username.
-   * Used for login validation and duplicate checks.
+   *
+   * @param username unique username
+   * @return matching player if found
    */
   Optional<Player> findByUsername(String username);
 
   /**
    * Retrieve all players sorted by high score in descending order.
-   * Used for the game leaderboard.
+   *
+   * @return players ordered by high score descending
    */
   List<Player> findAllByOrderByHighScoreDesc();
 }

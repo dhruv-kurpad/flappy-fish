@@ -11,6 +11,8 @@ public class Project3aApplication {
 
   /**
    * Starts the Spring Boot application.
+   *
+   * @param args CLI args
    */
   public static void main(String[] args) {
     SpringApplication.run(Project3aApplication.class, args);

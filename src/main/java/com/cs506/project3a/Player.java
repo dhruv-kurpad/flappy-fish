@@ -33,6 +33,9 @@ public class Player {
 
   /**
    * Constructs a Player with the given username and password.
+   *
+   * @param username unique username
+   * @param password password (currently stored as provided)
    */
   public Player(String username, String password) {
     this.username = username;

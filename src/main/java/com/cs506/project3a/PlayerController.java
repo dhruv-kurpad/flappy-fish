@@ -23,7 +23,11 @@ public class PlayerController {
 
   /**
    * Endpoint to register a new player.
-   * Returns: 0 = success, -1 = username already taken
+   * Returns: 0 = success, -1 = username already taken, -2 = empty username, -3 = empty password
+   *
+   * @param name username
+   * @param pwd password
+   * @return status code
    */
   @GetMapping("/register")
   public int register(@RequestParam String name, @RequestParam String pwd) {
@@ -44,6 +48,8 @@ public class PlayerController {
 
   /**
    * Endpoint to list all players for debugging.
+   *
+   * @return all players
    */
   @GetMapping("/all")
   public List<Player> getAllPlayers() {
@@ -52,6 +58,8 @@ public class PlayerController {
 
   /**
    * Endpoint to retrieve the leaderboard sorted by high score.
+   *
+   * @return players ordered by high score descending
    */
   @GetMapping("/leaderboard")
   public List<Player> getLeaderboard() {
@@ -61,6 +69,10 @@ public class PlayerController {
   /**
    * Endpoint to validate login credentials.
    * Returns code: 0 = success, -1 = username not found, -2 = incorrect password
+   *
+   * @param name username
+   * @param pwd password
+   * @return map with code and optional user data
    */
   @GetMapping("/login")
   public Map<String, Object> login(@RequestParam String name, @RequestParam String pwd) {
@@ -75,35 +87,46 @@ public class PlayerController {
     }
 
     return Map.of(
-        "code", 0,
-        "username", player.get().getUsername(),
-        "playerId", player.get().getId(),
-        "highScore", player.get().getHighScore()
-    );
+        "code",
+        0,
+        "username",
+        player.get().getUsername(),
+        "playerId",
+        player.get().getId(),
+        "highScore",
+        player.get().getHighScore());
   }
 
   /**
    * Update high score for a specific player.
    * Returns: 0 = score updated, 1 = current record is higher, -1 = user not found
+   *
+   * @param name username
+   * @param score new score
+   * @return status code
    */
   @GetMapping("/updateScore")
   public int updateScore(@RequestParam String name, @RequestParam int score) {
     Optional<Player> playerOpt = playerRepository.findByUsername(name);
-    if (playerOpt.isPresent()) {
-      Player player = playerOpt.get();
-      if (score > player.getHighScore()) {
-        player.setHighScore(score);
-        playerRepository.save(player);
-        return 0;
-      }
-      return 1;
+    if (playerOpt.isEmpty()) {
+      return -1;
     }
-    return -1;
+
+    Player player = playerOpt.get();
+    if (score > player.getHighScore()) {
+      player.setHighScore(score);
+      playerRepository.save(player);
+      return 0;
+    }
+    return 1;
   }
 
   /**
    * Remove a user for testing purposes.
    * Returns: 0 = removed successfully, -1 = user not found
+   *
+   * @param name username
+   * @return status code
    */
   @GetMapping("/remove")
   public int removeUser(@RequestParam String name) {
