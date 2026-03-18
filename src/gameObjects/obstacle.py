@@ -1,5 +1,5 @@
 from gameObjects.game_object import GameObject
-from gameObjects.sprite_translator import generate_sprite
+from gameObjects.sprite import Sprite
 from pathlib import Path
 
 # Obstacle Class, inherits from GameObject
@@ -14,7 +14,7 @@ class Obstacle(GameObject):
             sprite_path = sprite_path.resolve().parent.parent / "assets" / "tentacles_top.txt"
         else:
             sprite_path = sprite_path.resolve().parent.parent / "assets" / "tentacles_bottom.txt"
-        self._sprite = generate_sprite(str(sprite_path))
+        self._sprite = Sprite(str(sprite_path))
     
     @property
     def sprite(self):

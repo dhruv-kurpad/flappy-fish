@@ -1,5 +1,5 @@
 from gameObjects.game_object import GameObject
-from gameObjects.sprite_translator import generate_sprite
+from gameObjects.sprite import Sprite
 from pathlib import Path
 
 # Player Class, inherits from GameObject
@@ -10,7 +10,7 @@ class Player(GameObject):
     def __init__(self, x: int, y: int):
         self._position = (x, y)
         sprite_path = Path(__file__).resolve().parent.parent / "assets" / "fish.txt"
-        self._sprite = generate_sprite(str(sprite_path))
+        self._sprite = Sprite(str(sprite_path))
 
     @property
     def sprite(self):
