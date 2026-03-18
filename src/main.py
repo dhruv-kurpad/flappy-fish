@@ -22,37 +22,151 @@ def start_game(username):
     start_game_logic(username)
     input("\nGame Over! Press Enter to return to menu...")
 
+PAGE_SIZE = 10
+
+
+def _print_leaderboard_page(players, page, highlight_username=None):
+    start = page * PAGE_SIZE
+    end = min(start + PAGE_SIZE, len(players))
+    total_pages = (len(players) + PAGE_SIZE - 1) // PAGE_SIZE
+
+    print("\n" + "=" * 36)
+    print(f"       LEADERBOARD  (Page {page + 1}/{total_pages})")
+    print("=" * 36)
+    print(f"{'Rank':<7}{'Player':<15}{'Score':<4}")
+    print("-" * 36)
+
+    for i in range(start, end):
+        rank = i + 1
+        username = players[i].get("username", "---")
+        score = players[i].get("highScore", 0)
+        row = f"{rank:<7}{username:<15}{score:<4}"
+        if highlight_username and username == highlight_username:
+            print(">" * 36)
+            print(f"  {row}")
+            print(">" * 36)
+        else:
+            print(f"  {row}")
+
+    print("=" * 36)
+
+
+def _search_player(players):
+    username = input("Enter username to search: ").strip()
+    if not username:
+        print("No username entered.")
+        return
+
+    idx = next(
+        (i for i, p in enumerate(players) if p.get("username") == username), None
+    )
+
+    if idx is None:
+        print(f"Player '{username}' not found in leaderboard.")
+        return
+
+    context_start = max(0, idx - 2)
+    context_end = min(len(players), idx + 3)
+    context_players = players[context_start:context_end]
+
+    print("\n" + "=" * 36)
+    print(f"   SEARCH RESULT: {username}")
+    print("=" * 36)
+    print(f"{'Rank':<7}{'Player':<15}{'Score':<4}")
+    print("-" * 36)
+
+    for i, player in enumerate(context_players):
+        rank = context_start + i + 1
+        uname = player.get("username", "---")
+        score = player.get("highScore", 0)
+        row = f"{rank:<7}{uname:<15}{score:<4}"
+        if uname == username:
+            print("+" + "-" * 34 + "+")
+            print(f"| {row:<34}|")
+            print("+" + "-" * 34 + "+")
+        else:
+            print(f"  {row}")
+
+    print("=" * 36)
+
+
 def display_leaderboard():
     result = get_leaderboard()
 
-    print("\n" + "=" * 30)
-    print("          LEADERBOARD")
-    print("=" * 30)
-
     if not result["success"]:
+        print("\n" + "=" * 36)
         print(f"Error: {result['message']}")
-        print("=" * 30 + "\n")
+        print("=" * 36 + "\n")
         input("Press Enter to return to menu...")
         return
 
     players = result["players"]
 
     if not players:
+        print("\n" + "=" * 36)
         print("No leaderboard data available yet.")
-        print("=" * 30 + "\n")
+        print("=" * 36 + "\n")
         input("Press Enter to return to menu...")
         return
 
-    print(f"{'Rank':<7}{'Player':<15}{'Score':<4}")
-    print("-" * 30)
+    page = 0
+    total_pages = (len(players) + PAGE_SIZE - 1) // PAGE_SIZE
 
-    for rank, player in enumerate(players, start=1):
-        username = player.get("username", "---")
-        score = player.get("highScore", 0)
-        print(f"{rank:<7}{username:<15}{score:<4}")
+    while True:
+        _print_leaderboard_page(players, page)
 
-    print("=" * 30 + "\n")
-    input("Press Enter to return to menu...")
+        has_prev = page > 0
+        has_next = page < total_pages - 1
+
+        options = []
+        if has_prev:
+            options.append(("prev", "Previous page"))
+        if has_next:
+            options.append(("next", "Next page"))
+        options.append(("goto", f"Go to page (1-{total_pages})"))
+        options.append(("search", "Search player"))
+        options.append(("back", "Back to main menu"))
+
+        print()
+        for i, (_, label) in enumerate(options, start=1):
+            print(f"{i}. {label}")
+
+        choice = input("Select an option: ").strip()
+
+        if not choice.isdigit() or not (1 <= int(choice) <= len(options)):
+            print("Invalid choice, try again.")
+            continue
+
+        action = options[int(choice) - 1][0]
+
+        if action == "prev":
+            page -= 1
+        elif action == "next":
+            page += 1
+        elif action == "goto":
+            target = input(f"Enter page number (1-{total_pages}): ").strip()
+            if target.isdigit() and 1 <= int(target) <= total_pages:
+                page = int(target) - 1
+            else:
+                print(f"Invalid page number, must be between 1 and {total_pages}.")
+        elif action == "search":
+            _search_player(players)
+            while True:
+                print()
+                print("1. Back to leaderboard")
+                print("2. Search player")
+                print("3. Back to main menu")
+                sub = input("Select an option: ").strip()
+                if sub == "1":
+                    break
+                elif sub == "2":
+                    _search_player(players)
+                elif sub == "3":
+                    return
+                else:
+                    print("Invalid choice, try again.")
+        elif action == "back":
+            return
 
 # Input validation
 def validate_credentials(username, password):
