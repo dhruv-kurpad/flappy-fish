@@ -71,31 +71,30 @@ WIP
 
 ```mermaid
 ---
-title: Sample Class Diagram for Animal Program
+title: GameObject Class Diagram
 ---
 classDiagram
-    class Animal {
-        - String name
-        + Animal(String name)
-        + void setName(String name)
-        + String getName()
-        + void makeSound()
+    class GameObject {
+        - Tuple[int, int] position
+        - Sprite sprite
+        - int width
+        - int height
+        + void update()
     }
-    class Dog {
-        + Dog(String name)
-        + void makeSound()
+    class Player {
+        + Player(int x, int y)
+        + void update()
     }
-    class Cat {
-        + Cat(String name)
-        + void makeSound()
+    class Obstacle {
+        + Obstacle(int x, int y, bool top)
+        + void update()
     }
-    class Bird {
-        + Bird(String name)
-        + void makeSound()
+    class Sprite {
+        - List[List[str]] display
+        + Sprite(str file_path)
     }
-    Animal <|-- Dog
-    Animal <|-- Cat
-    Animal <|-- Bird
+    GameObject <|-- Player
+    GameObject <|-- Obstacle
 ```
 
 #### Flowchart
