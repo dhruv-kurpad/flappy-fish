@@ -28,6 +28,20 @@ lint_backend:
 #####################################
 ############## Testing ##############
 #####################################
+unit_test_frontend:
+  stage: unit_test  
+  tags:
+    - cs506
+  image: python
+  script:
+    - python src/test.py 2>&1 | tee results.log
+  artifacts:
+    untracked: true
+    when: on_success
+    expire_in: 30 days
+    paths:
+      - results.log
+
 unit_test_backend:
   stage: unit_test
   image: eclipse-temurin:21-jdk
