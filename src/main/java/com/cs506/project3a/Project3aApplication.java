@@ -4,18 +4,17 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 /**
- * Spring Boot entrypoint for the Project 3A backend.
+ * Main entry point for the Project 3a Spring Boot application.
  */
 @SpringBootApplication
 public class Project3aApplication {
 
   /**
-   * Application entrypoint.
+   * Starts the Spring Boot application.
    *
    * @param args CLI args
    */
   public static void main(String[] args) {
     SpringApplication.run(Project3aApplication.class, args);
   }
-
 }

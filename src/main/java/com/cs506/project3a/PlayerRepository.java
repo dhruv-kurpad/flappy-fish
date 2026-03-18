@@ -6,10 +6,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 /**
- * JPA repository for {@link Player} records.
+ * Repository interface for Player entity database operations.
  */
 @Repository
 public interface PlayerRepository extends JpaRepository<Player, Long> {
+
   /**
    * Find a player by their username.
    *

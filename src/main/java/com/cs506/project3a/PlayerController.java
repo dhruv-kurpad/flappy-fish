@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * HTTP API for player registration, login, and leaderboard/score operations.
+ * REST controller for player management operations.
  */
 @RestController
 @RequestMapping("/api/players")
@@ -21,48 +21,74 @@ public class PlayerController {
   @Autowired
   private PlayerRepository playerRepository;
 
-  /** Register a new player. */
+  /**
+   * Endpoint to register a new player.
+   * Returns: 0 = success, -1 = username already taken, -2 = empty username, -3 = empty password
+   *
+   * @param name username
+   * @param pwd password
+   * @return status code
+   */
   @GetMapping("/register")
-  public String register(@RequestParam String name, @RequestParam String pwd) {
+  public int register(@RequestParam String name, @RequestParam String pwd) {
+    if (name == null || name.isBlank()) {
+      return -2;
+    }
+    if (pwd == null || pwd.isBlank()) {
+      return -3;
+    }
     if (playerRepository.findByUsername(name).isPresent()) {
-      return "Registration Failed: Username '" + name + "' is already taken.";
+      return -1;
     }
 
     Player newPlayer = new Player(name, pwd);
     playerRepository.save(newPlayer);
-    return "Registration Successful! Player ID: " + newPlayer.getId();
+    return 0;
   }
 
-  /** List all players (debugging). */
+  /**
+   * Endpoint to list all players for debugging.
+   *
+   * @return all players
+   */
   @GetMapping("/all")
   public List<Player> getAllPlayers() {
     return playerRepository.findAll();
   }
 
-  /** Retrieve leaderboard sorted by high score (descending). */
+  /**
+   * Endpoint to retrieve the leaderboard sorted by high score.
+   *
+   * @return players ordered by high score descending
+   */
   @GetMapping("/leaderboard")
   public List<Player> getLeaderboard() {
     return playerRepository.findAllByOrderByHighScoreDesc();
   }
 
-  /** Validate login credentials. */
+  /**
+   * Endpoint to validate login credentials.
+   * Returns code: 0 = success, -1 = username not found, -2 = incorrect password
+   *
+   * @param name username
+   * @param pwd password
+   * @return map with code and optional user data
+   */
   @GetMapping("/login")
   public Map<String, Object> login(@RequestParam String name, @RequestParam String pwd) {
     Optional<Player> player = playerRepository.findByUsername(name);
 
     if (player.isEmpty()) {
-      return Map.of("success", false, "message", "Login Failed: Username not found.");
+      return Map.of("code", -1);
     }
 
     if (!player.get().getPassword().equals(pwd)) {
-      return Map.of("success", false, "message", "Login Failed: Incorrect password.");
+      return Map.of("code", -2);
     }
 
     return Map.of(
-        "success",
-        true,
-        "message",
-        "Login successful!",
+        "code",
+        0,
         "username",
         player.get().getUsername(),
         "playerId",
@@ -71,32 +97,44 @@ public class PlayerController {
         player.get().getHighScore());
   }
 
-  /** Update high score for a player, but only if the new score is higher. */
+  /**
+   * Update high score for a specific player.
+   * Returns: 0 = score updated, 1 = current record is higher, -1 = user not found
+   *
+   * @param name username
+   * @param score new score
+   * @return status code
+   */
   @GetMapping("/updateScore")
-  public String updateScore(@RequestParam String name, @RequestParam int score) {
+  public int updateScore(@RequestParam String name, @RequestParam int score) {
     Optional<Player> playerOpt = playerRepository.findByUsername(name);
     if (playerOpt.isEmpty()) {
-      return "User not found.";
+      return -1;
     }
 
     Player player = playerOpt.get();
     if (score > player.getHighScore()) {
       player.setHighScore(score);
       playerRepository.save(player);
-      return "Score updated.";
+      return 0;
     }
-
-    return "Current record is higher.";
+    return 1;
   }
 
-  /** Remove a player by username (for testing/demo). */
+  /**
+   * Remove a user for testing purposes.
+   * Returns: 0 = removed successfully, -1 = user not found
+   *
+   * @param name username
+   * @return status code
+   */
   @GetMapping("/remove")
-  public String removeUser(@RequestParam String name) {
+  public int removeUser(@RequestParam String name) {
     Optional<Player> player = playerRepository.findByUsername(name);
     if (player.isEmpty()) {
-      return "No user with username '" + name + "' found.";
+      return -1;
     }
     playerRepository.delete(player.get());
-    return "User '" + name + "' removed successfully.";
+    return 0;
   }
 }

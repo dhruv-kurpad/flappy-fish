@@ -8,7 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * Database entity representing a player account and score.
+ * Entity class representing a player in the game.
  */
 @Entity
 @Table(name = "players")
@@ -32,7 +32,7 @@ public class Player {
   public Player() {}
 
   /**
-   * Create a new player record with a starting high score of 0.
+   * Constructs a Player with the given username and password.
    *
    * @param username unique username
    * @param password password (currently stored as provided)
