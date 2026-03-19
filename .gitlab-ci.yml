@@ -36,7 +36,6 @@ unit_test_frontend:
   script:
     - python src/test.py 2>&1 | tee results.log
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - when: never
   artifacts:
@@ -50,7 +49,6 @@ unit_test_backend:
   stage: unit_test
   image: eclipse-temurin:21-jdk
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - when: never
   script:
