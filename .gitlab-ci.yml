@@ -35,6 +35,10 @@ unit_test_frontend:
   image: python
   script:
     - python src/test.py 2>&1 | tee results.log
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - when: never
   artifacts:
     untracked: true
     when: on_success
@@ -45,16 +49,10 @@ unit_test_frontend:
 unit_test_backend:
   stage: unit_test
   image: eclipse-temurin:21-jdk
-  #####################################
-  ########### REMOVE THIS BLOCK ###############
-  #####################################
   rules:
-    # Unit tests are currently unstable; disable in CI for now.
-    # Re-enable by removing this rules block.
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - when: never
-  #####################################
-  ########### REMOVE THIS BLOCK ###############
-  #####################################
   script:
     - ./gradlew clean test
   coverage: '/COVERAGE: ([0-9]{1,3}%)/'
