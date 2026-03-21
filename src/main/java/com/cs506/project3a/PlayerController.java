@@ -76,16 +76,20 @@ public class PlayerController {
    */
   @GetMapping("/login")
   public Map<String, Object> login(@RequestParam String name, @RequestParam String pwd) {
+    // Look up the player by username in the repository.
     Optional<Player> player = playerRepository.findByUsername(name);
 
+    // Return code -1 if no user with the given username exists.
     if (player.isEmpty()) {
       return Map.of("code", -1);
     }
 
+    // Return code -2 if the password does not match the stored password.
     if (!player.get().getPassword().equals(pwd)) {
       return Map.of("code", -2);
     }
 
+    // Return code 0 and player information if login is successful.
     return Map.of(
         "code",
         0,
