@@ -2,84 +2,54 @@ package com.cs506.project3a;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
 class Project3aApplicationTests {
 
-    private PlayerController pc;
-	/* Tests basic functionality of adding and removing users
-	*/
-	@Test
-	void addUserTest() {
-		//Adds first user
-		Player testUser = new Player("WittyName", "password");
-		pc.register(testUser);
-		assert(pc.getUserByName("WittyName") == testUser.getUsername());
+  @Autowired
+  private PlayerController pc;
 
-        //Adds second user
-		Player nextUser = new Player("newName", "1234");
-		pc.register(nextUser);
-		assert(pc.getUserByName("newName") == nextUser.getUsername());
+  @Test
+  void addUserTest() {
+    assert (pc.register("WittyName", "password") == 0);
+    assert ((int) pc.login("WittyName", "password").get("code") == 0);
 
-		//removes both
-         pc.removeUser("WittyName");
-	    pc.removeUser("newName");
+    assert (pc.register("newName", "1234") == 0);
+    assert ((int) pc.login("newName", "1234").get("code") == 0);
 
-		assert(pc.getAllPlayers == NULL);
+    pc.removeUser("WittyName");
+    pc.removeUser("newName");
+  }
 
-	}
+  @Test
+  void sameUserTest() {
+    pc.register("WittyName", "password");
+    assert (pc.register("WittyName", "password") == -1);
+    assert (pc.register("WittyName", "badPass") == -1);
 
-    // Tests if system correctly rejects adding a new user with an already taken Username
-	@Test
-	void sameUserTest() {
-		//Tests if same object uploaded twice
-		Player testUser = new Player("WittyName", "password");
-		pc.register(testUser);
-		assert(pc.register(testUser).equals("Registration Failed: Username 'WittyName' is already taken."))
+    pc.removeUser("WittyName");
+  }
 
-        //Checks if same name diff password is still correctly rejected
-        Player sameName = new Player("WittyName", "badPass");
-		assert(pc.register(sameName).equals("Registration Failed: Username 'WittyName' is already taken."));
+  @Test
+  void samePasswordTest() {
+    pc.register("WittyName", "password");
+    assert (pc.register("NewName", "password") == 0);
+    assert ((int) pc.login("NewName", "password").get("code") == 0);
 
-		 pc.removeUser("WittyName");
+    pc.removeUser("WittyName");
+    pc.removeUser("NewName");
+  }
 
-	}
+  @Test
+  void emptyUserTest() {
+    assert (pc.register("", "password") == -2);
+    assert ((int) pc.login("", "password").get("code") == -1);
+  }
 
-	@Test
-	void samePasswordTest(){
-
-		Player testUser = new Player("WittyName", "password");
-		Player newUser = new Player("NewName", "password");
-		pc.register(testUser);
-		assert(pc.register(newUser)== "Registration Successful! Player ID: " + newUser.getId());
-		assert(pc.getUserByName("NewName") == testUser.getUsername())
-       
-	     pc.removeUser("WittyName");
-	     pc.removeUser("newName");
-
-
-	}
-
-    //Tests if the system correctly rejects entries with no username
-	@Test
-	void emptyUserTest() {
-
-		//Tests that both the registration fxn reports an error and the database is unaffected
-		Player testUser = new Player("", "password");
-		assert(pc.register(testUser).equals("Registration Failed: Username can not be empty."));
-		assert(pc.getAllPlayers == NULL);
-
-	}
-
-    //Tests if the saystem correctly rejects entries with no Password
-	@Test
-	void emptyPasswordTest() {
-
-		//Tests that both the registration fxn reports an error and the database is unaffected
-		Player testUser = new Player("WittyName", "");
-		assert(pc.register(testUser).equals("Registration Failed: Password can not be empty."));
-		assert(pc.getAllPlayers == NULL);
-	}
-
+  @Test
+  void emptyPasswordTest() {
+    assert (pc.register("WittyName", "") == -3);
+    assert ((int) pc.login("WittyName", "").get("code") == -1);
+  }
 }

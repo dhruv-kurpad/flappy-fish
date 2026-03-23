@@ -28,9 +28,29 @@ lint_backend:
 #####################################
 ############## Testing ##############
 #####################################
+unit_test_frontend:
+  stage: unit_test  
+  tags:
+    - cs506
+  image: python
+  script:
+    - python src/test.py 2>&1 | tee results.log
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - when: never
+  artifacts:
+    untracked: true
+    when: on_success
+    expire_in: 30 days
+    paths:
+      - results.log
+
 unit_test_backend:
   stage: unit_test
   image: eclipse-temurin:21-jdk
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - when: never
   script:
     - ./gradlew clean test
   coverage: '/COVERAGE: ([0-9]{1,3}%)/'

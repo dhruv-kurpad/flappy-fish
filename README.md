@@ -71,31 +71,30 @@ WIP
 
 ```mermaid
 ---
-title: Sample Class Diagram for Animal Program
+title: GameObject Class Diagram
 ---
 classDiagram
-    class Animal {
-        - String name
-        + Animal(String name)
-        + void setName(String name)
-        + String getName()
-        + void makeSound()
+    class GameObject {
+        - Tuple[int, int] position
+        - Sprite sprite
+        - int width
+        - int height
+        + void update()
     }
-    class Dog {
-        + Dog(String name)
-        + void makeSound()
+    class Player {
+        + Player(int x, int y)
+        + void update()
     }
-    class Cat {
-        + Cat(String name)
-        + void makeSound()
+    class Obstacle {
+        + Obstacle(int x, int y, bool top)
+        + void update()
     }
-    class Bird {
-        + Bird(String name)
-        + void makeSound()
+    class Sprite {
+        - List[List[str]] display
+        + Sprite(str file_path)
     }
-    Animal <|-- Dog
-    Animal <|-- Cat
-    Animal <|-- Bird
+    GameObject <|-- Player
+    GameObject <|-- Obstacle
 ```
 
 #### Flowchart
@@ -162,3 +161,66 @@ deactivate DjangoBackend
 
 <!--This is a link to a seperate coding conventions document / style guide-->
 [Style Guide & Conventions](STYLE.md)
+
+---
+
+### Getting Started
+
+### Running the Backend and MySQL (Local Docker)
+Start the stack:
+
+The backend and MySQL run on the course VM. Use this base URL for the API:
+
+
+Example API calls:
+
+```bash
+# Register a player
+    curl "http://cs506x3a.cs.wisc.edu:8080/api/players/register?name=string&pwd=string"
+
+# List players
+     curl "http://cs506x3a.cs.wisc.edu:8080/api/players/all"
+```
+
+Stop the stack:
+
+```bash
+docker compose --profile dev down
+```
+
+---
+
+### Using the Shared VM Database (cs506x3a)
+
+The backend and MySQL can also run on the course VM `cs506x3a.cs.wisc.edu`.
+
+Connect to the campus vpn to use
+
+All players are stored in the MySQL DB on `cs506x3a`, so everyone sees the same data.
+
+---
+
+### Python Client / Game
+Set up a virtual environment and install dependencies:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r src/requirements.txt
+```
+
+Run the game:
+
+```bash
+python src/main.py
+```
+
+### Testing
+
+Run all JUnit tests:
+
+```bash
+gradle test
+```
+
+Check: build/reports for results

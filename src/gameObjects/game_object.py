@@ -1,4 +1,5 @@
-from typing import List, Tuple
+from typing import Tuple
+from gameObjects.sprite import Sprite
 from abc import ABC, abstractmethod
 
 # GameObject Class, abstract base class for all game objects
@@ -11,15 +12,16 @@ class GameObject(ABC):
         raise NotImplementedError
     
     @property
-    def sprite(self) -> List[List[str]]:
+    def sprite(self) -> Sprite:
         raise NotImplementedError
     
     @property
     def width(self) -> int:
-        return len(self.sprite[0]) if self.sprite else 0
+        return len(self.sprite.display[0]) if self.sprite.display else 0
     
+    @property
     def height(self) -> int:
-        return len(self.sprite) if self.sprite else 0
+        return len(self.sprite.display) if self.sprite.display else 0
     
     @abstractmethod
     def update(self) -> None:
