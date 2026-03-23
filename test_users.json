@@ -1,0 +1,22 @@
+[
+  { "username": "AquaAlex", "password": "test01" },
+  { "username": "CoralByte", "password": "test02" },
+  { "username": "DepthRunner", "password": "test03" },
+  { "username": "EchoFin", "password": "test04" },
+  { "username": "FinleyPark", "password": "test05" },
+  { "username": "GuppyGamer", "password": "test06" },
+  { "username": "HarborNate", "password": "test07" },
+  { "username": "IndigoReef", "password": "test08" },
+  { "username": "JetstreamJay", "password": "test09" },
+  { "username": "KelpKnight", "password": "test10" },
+  { "username": "LunaCurrent", "password": "test11" },
+  { "username": "MarinaMia", "password": "test12" },
+  { "username": "NeptuneNoah", "password": "test13" },
+  { "username": "OceanOlive", "password": "test14" },
+  { "username": "PixelPuffer", "password": "test15" },
+  { "username": "QuinnTide", "password": "test16" },
+  { "username": "ReefRyder", "password": "test17" },
+  { "username": "SandySkye", "password": "test18" },
+  { "username": "TidalTheo", "password": "test19" },
+  { "username": "WaveZara", "password": "test20" }
+]

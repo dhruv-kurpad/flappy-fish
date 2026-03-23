@@ -107,3 +107,20 @@ def get_leaderboard():
         "message": "Leaderboard loaded successfully.",
         "players": data
     }
+
+# Update a player's high score with the backend API
+def update_score(username, score):
+    try:
+        response = requests.get(
+            f"{BASE_URL}/updateScore",
+            # Pass the username and new score as query parameters.
+            params={"name": username, "score": score},
+            #Stop waiting if no response after 5 seconds
+            timeout=5,
+        )
+        response.raise_for_status()
+    #Code if backend cannot be reached
+    except requests.RequestException:
+        return {"code": -99}
+    # Convert the backend text response into an integer status code.
+    return {"code": int(response.text)}
