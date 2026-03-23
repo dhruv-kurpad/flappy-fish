@@ -4,8 +4,10 @@ from gameObjects.obstacle import Obstacle
 from gameObjects.player import Player
 
 # Dimensions of the game area
+"""
 HEIGHT = 24
 WIDTH = 100
+"""
 
 # Header template for the game display
 # XX and YY are placeholders for score and high score, respectively
@@ -27,15 +29,20 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
     updated_header = HEADER.replace("XX", str(score) if score >= 10 else "0" + str(score)).replace("YY", str(high_score) if high_score >= 10 else "0" + str(high_score))
     output += updated_header
 
+    #Temporary code for now!
+    WIDTH = term.width
+    HEIGHT = term.height - 3
+    #Temporary code for now!
+    
     # Draw the game area with player and obstacles
     for y in range(HEIGHT):
         line = ""
         for x in range(WIDTH):
-            if x >= player.position[0] and x < player.position[0] + player.width and y >= player.position[1] and y < player.position[1] + player.height:
-                line += player.sprite.display[y - player.position[1]][x - player.position[0]]
-            elif any(x >= obs.position[0] and x < obs.position[0] + obs.width and y >= obs.position[1] and y < obs.position[1] + obs.height for obs in obstacles):
-                obs = next(obs for obs in obstacles if x >= obs.position[0] and x < obs.position[0] + obs.width and y >= obs.position[1] and y < obs.position[1] + obs.height)
-                line += obs.sprite.display[y - obs.position[1]][x - obs.position[0]]
+            if x >= round(player.position[0]) and x < round(player.position[0]) + player.width and y >= round(player.position[1]) and y < round(player.position[1]) + player.height:
+                line += f"{term.yellow}{player.sprite.display[y - round(player.position[1])][x - round(player.position[0])]}{term.normal}"
+            elif any(x >= round(obs.position[0]) and x < round(obs.position[0]) + obs.width and y >= round(obs.position[1]) and y < round(obs.position[1]) + obs.height for obs in obstacles):
+                obs = next(obs for obs in obstacles if x >= round(obs.position[0]) and x < round(obs.position[0]) + obs.width and y >= round(obs.position[1]) and y < round(obs.position[1]) + obs.height)
+                line += f"{term.green}{obs.sprite.display[y - round(obs.position[1])][x - round(obs.position[0])]}{term.normal}"
             else:
                 line += " "
         output += line + "\n"
@@ -44,7 +51,7 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
 # Example use case for testing the draw function
 if __name__ == "__main__":
     term = Terminal()
-    player = Player(10, 5)
+    player = Player(10.4, 5.5)
     score = 10
     high_score = 8
     obstacles = [Obstacle(70, 19, False), Obstacle(70, -5, True)]

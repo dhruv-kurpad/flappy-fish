@@ -8,7 +8,7 @@ from abc import ABC, abstractmethod
 # - sprite: List[List[str]] (2D array representing the visual representation of the object)
 class GameObject(ABC):
     @property
-    def position(self) -> Tuple[int, int]:
+    def position(self) -> Tuple[float, float]:
         raise NotImplementedError
     
     @property

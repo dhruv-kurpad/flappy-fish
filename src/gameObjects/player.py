@@ -7,7 +7,7 @@ from pathlib import Path
 #  - position: Tuple[int, int] (x and y coordinates of the player)
 #  - sprite: List[List[str]] (2D array representing the visual representation of the player)
 class Player(GameObject):
-    def __init__(self, x: int, y: int):
+    def __init__(self, x: float, y: float):
         self._position = (x, y)
         sprite_path = Path(__file__).resolve().parent.parent / "assets" / "fish.txt"
         self._sprite = Sprite(str(sprite_path))
