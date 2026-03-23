@@ -7,7 +7,7 @@ from pathlib import Path
 #  - position: Tuple[int, int] (x and y coordinates of the obstacle)
 #  - sprite: List[List[str]] (2D array representing the visual representation of the obstacle)
 class Obstacle(GameObject):
-    def __init__(self, x: int, y: int, top: bool):
+    def __init__(self, x: float, y: float, top: bool):
         self._position = (x, y)
         sprite_path = Path(__file__)
         if top:
