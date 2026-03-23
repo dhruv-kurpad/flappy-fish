@@ -1,60 +1,198 @@
 import sys
+import time
 from auth import login_user, register_user, remove_user, get_leaderboard
 from game_logic import start_game_logic
+from colorama import init, Fore, Style
 
+init(autoreset=True)
 
-# Display Menu
-def show_menu():
-    print("\n=== FLAPPY BIRD ===")
-    print("1. Login")
-    print("2. Register")
-    print("3. Leaderboard")
-    print("4. Exit")
-    print("DEBUG: 5. Remove User")
-    return input("Select an option: ")
+# ── Color shortcuts ──────────────────────────────────────────────────────────
+Y   = Fore.YELLOW
+C   = Fore.CYAN
+G   = Fore.GREEN
+R   = Fore.RED
+W   = Fore.WHITE
+DIM = Style.DIM
+BRT = Style.BRIGHT
+RST = Style.RESET_ALL
 
-# Core game logic function
-def start_game(username):
-    print(f"\nWelcome, {username}!")
-    print("--- GAME STARTING ---")
-    print(" (control options) ")
-    # Flappy Bird logic
-    start_game_logic(username)
-    input("\nGame Over! Press Enter to return to menu...")
+# ── ASCII Banner ─────────────────────────────────────────────────────────────
+BANNER = (
+    f"\n{Y}"
+    "   ███████╗██╗      █████╗ ██████╗ ██████╗ ██╗   ██╗\n"
+    "   ██╔════╝██║     ██╔══██╗██╔══██╗██╔══██╗╚██╗ ██╔╝\n"
+    "   █████╗  ██║     ███████║██████╔╝██████╔╝ ╚████╔╝ \n"
+    "   ██╔══╝  ██║     ██╔══██║██╔═══╝ ██╔═══╝   ╚██╔╝  \n"
+    "   ██║     ███████╗██║  ██║██║     ██║        ██║    \n"
+    "   ╚═╝     ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝        ╚═╝   \n"
+    f"{C}"
+    "           ███████╗██╗███████╗██╗  ██╗\n"
+    "           ██╔════╝██║██╔════╝██║  ██║\n"
+    "           █████╗  ██║███████╗███████║\n"
+    "           ██╔══╝  ██║╚════██║██╔══██║\n"
+    "           ██║     ██║███████║██║  ██║\n"
+    f"           ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝ {RST}\n"
+)
+
+current_user = None
 
 PAGE_SIZE = 10
 
+MEDALS = {
+    1: f"{Y}{BRT}[1ST]{RST}",
+    2: f"{W}{BRT}[2ND]{RST}",
+    3: f"{Fore.RED}{BRT}[3RD]{RST}",
+}
 
+
+def _typewriter(text, delay=0.03):
+    for ch in text:
+        print(ch, end="", flush=True)
+        time.sleep(delay)
+    print()
+
+
+# ── Display Menu ─────────────────────────────────────────────────────────────
+def show_menu():
+    print(f"\n{Y}{'═' * 32}{RST}")
+    print(f"  {Y}{BRT}        FLAPPY  FISH{RST}")
+    print(f"{Y}{'═' * 32}{RST}")
+
+    if current_user:
+        print(f"  {G}● Logged in as: {BRT}{current_user}{RST}")
+        print(f"{Y}{'─' * 32}{RST}")
+        options = [
+            ("start",       "Start Game"),
+            ("leaderboard", "Leaderboard"),
+            ("logout",      "Logout"),
+            ("exit",        "Exit"),
+        ]
+    else:
+        options = [
+            ("login",       "Login"),
+            ("register",    "Register"),
+            ("leaderboard", "Leaderboard"),
+            ("exit",        "Exit"),
+        ]
+
+    for i, (_, label) in enumerate(options, start=1):
+        print(f"  {C}{i}.{RST} {label}")
+    print(f"  {DIM}{len(options) + 1}. Remove User (DEBUG){RST}")
+    print(f"{Y}{'═' * 32}{RST}")
+
+    choice = input(f"  {C}› {RST}").strip()
+    # TESTING CODE
+    if choice == str(len(options) + 2):
+        return "test"
+    # TESTING CODE
+    if choice.isdigit() and 1 <= int(choice) <= len(options):
+        return options[int(choice) - 1][0]
+    if choice == str(len(options) + 1):
+        return "remove"
+    return "invalid"
+
+
+# ── Game rules screen ────────────────────────────────────────────────────────
+def show_rules():
+    print(f"\n{C}{'═' * 42}{RST}")
+    print(f"  {Y}{BRT}HOW TO PLAY{RST}")
+    print(f"{C}{'═' * 42}{RST}")
+    print(f"""
+  {W}Objective:{RST}
+    Guide your fish through the gaps between
+    pipes and survive as long as possible.
+
+  {W}Controls:{RST}
+    {C}SPACE{RST}  — Flap wings (jump up)
+    {C}Q{RST}      — Quit to menu
+
+  {W}Scoring:{RST}
+    +1 point for every pipe you pass through.
+    Your {Y}high score{RST} is saved automatically.
+
+  {W}Tips:{RST}
+    • Tap quickly for small hops.
+    • Gravity pulls you down constantly.
+    • The pipes move faster over time.
+""")
+    print(f"{C}{'═' * 42}{RST}")
+    print(f"  {C}1.{RST} Start game")
+    print(f"  {C}2.{RST} Back to main menu")
+    print(f"{C}{'═' * 42}{RST}")
+    choice = input(f"  {C}› {RST}").strip()
+    if choice != "1":
+        return False
+    for i in range(3, 0, -1):
+        print(f"\r  {Y}{BRT}Starting in {i}...{RST}   ", end="", flush=True)
+        time.sleep(1)
+    print(f"\r  {G}{BRT}GO!               {RST}")
+    time.sleep(0.3)
+    return True
+
+
+# ── Core game logic function ─────────────────────────────────────────────────
+def start_game(username):
+    print()
+    _typewriter(f"{G}Welcome, {username}! Get ready...{RST}", delay=0.04)
+    while True:
+        if not show_rules():
+            return
+        print(f"{Y}--- GAME STARTING ---{RST}")
+        print(" (control options) ")
+        start_game_logic(username)
+
+        print(f"\n{R}{'═' * 32}{RST}")
+        print(f"  {R}{BRT}    GAME  OVER{RST}")
+        print(f"{R}{'═' * 32}{RST}")
+        print(f"  {C}1.{RST} Play again")
+        print(f"  {C}2.{RST} Back to main menu")
+        print(f"{R}{'═' * 32}{RST}")
+        choice = input(f"  {C}› {RST}").strip()
+        if choice != "1":
+            return
+
+
+# ── Leaderboard helpers ──────────────────────────────────────────────────────
 def _print_leaderboard_page(players, page, highlight_username=None):
     start = page * PAGE_SIZE
     end = min(start + PAGE_SIZE, len(players))
     total_pages = (len(players) + PAGE_SIZE - 1) // PAGE_SIZE
 
-    print("\n" + "=" * 36)
-    print(f"       LEADERBOARD  (Page {page + 1}/{total_pages})")
-    print("=" * 36)
-    print(f"{'Rank':<7}{'Player':<15}{'Score':<4}")
-    print("-" * 36)
+    print(f"\n{C}{'═' * 38}{RST}")
+    print(f"  {Y}{BRT}   LEADERBOARD{RST}  "
+          f"{DIM}(Page {page + 1}/{total_pages}){RST}")
+    print(f"{C}{'═' * 38}{RST}")
+    print(f"  {BRT}{'Rank':<8}{'Player':<15}{'Score'}{RST}")
+    print(f"{C}{'-' * 38}{RST}")
 
     for i in range(start, end):
         rank = i + 1
         username = players[i].get("username", "---")
         score = players[i].get("highScore", 0)
-        row = f"{rank:<7}{username:<15}{score:<4}"
+
+        medal = MEDALS.get(rank, "     ")
+        row = f"{medal} {rank:<4} {username:<15}{score}"
+
         if highlight_username and username == highlight_username:
-            print(">" * 36)
+            print(f"{Y}{'>' * 38}{RST}")
             print(f"  {row}")
-            print(">" * 36)
+            print(f"{Y}{'>' * 38}{RST}")
+        elif rank == 1:
+            print(f"  {Y}{BRT}{row}{RST}")
+        elif rank == 2:
+            print(f"  {W}{BRT}{row}{RST}")
+        elif rank == 3:
+            print(f"  {Fore.RED}{BRT}{row}{RST}")
         else:
             print(f"  {row}")
 
-    print("=" * 36)
+    print(f"{C}{'═' * 38}{RST}")
 
 
 def _search_player(players):
-    username = input("Enter username to search: ").strip()
+    username = input(f"  {C}Enter username to search: {RST}").strip()
     if not username:
-        print("No username entered.")
+        print(f"{R}No username entered.{RST}")
         return
 
     idx = next(
@@ -62,50 +200,50 @@ def _search_player(players):
     )
 
     if idx is None:
-        print(f"Player '{username}' not found in leaderboard.")
+        print(f"{R}Player '{username}' not found in leaderboard.{RST}")
         return
 
     context_start = max(0, idx - 2)
     context_end = min(len(players), idx + 3)
     context_players = players[context_start:context_end]
 
-    print("\n" + "=" * 36)
-    print(f"   SEARCH RESULT: {username}")
-    print("=" * 36)
-    print(f"{'Rank':<7}{'Player':<15}{'Score':<4}")
-    print("-" * 36)
+    print(f"\n{C}{'═' * 38}{RST}")
+    print(f"  {Y}{BRT}SEARCH RESULT: {username}{RST}")
+    print(f"{C}{'═' * 38}{RST}")
+    print(f"  {BRT}{'Rank':<8}{'Player':<15}{'Score'}{RST}")
+    print(f"{C}{'-' * 38}{RST}")
 
     for i, player in enumerate(context_players):
         rank = context_start + i + 1
         uname = player.get("username", "---")
         score = player.get("highScore", 0)
-        row = f"{rank:<7}{uname:<15}{score:<4}"
+        row = f"{rank:<8}{uname:<15}{score}"
         if uname == username:
-            print("+" + "-" * 34 + "+")
-            print(f"| {row:<34}|")
-            print("+" + "-" * 34 + "+")
+            print(f"{Y}  +{'─' * 34}+{RST}")
+            print(f"{Y}  | {row:<34}|{RST}")
+            print(f"{Y}  +{'─' * 34}+{RST}")
         else:
-            print(f"  {row}")
+            print(f"    {row}")
 
-    print("=" * 36)
+    print(f"{C}{'═' * 38}{RST}")
 
 
 def display_leaderboard():
     result = get_leaderboard()
 
     if not result["success"]:
-        print("\n" + "=" * 36)
-        print(f"Error: {result['message']}")
-        print("=" * 36 + "\n")
+        print(f"\n{R}{'═' * 38}{RST}")
+        print(f"{R}Error: {result['message']}{RST}")
+        print(f"{R}{'═' * 38}{RST}\n")
         input("Press Enter to return to menu...")
         return
 
     players = result["players"]
 
     if not players:
-        print("\n" + "=" * 36)
-        print("No leaderboard data available yet.")
-        print("=" * 36 + "\n")
+        print(f"\n{Y}{'═' * 38}{RST}")
+        print("  No leaderboard data available yet.")
+        print(f"{Y}{'═' * 38}{RST}\n")
         input("Press Enter to return to menu...")
         return
 
@@ -129,12 +267,12 @@ def display_leaderboard():
 
         print()
         for i, (_, label) in enumerate(options, start=1):
-            print(f"{i}. {label}")
+            print(f"  {C}{i}.{RST} {label}")
 
-        choice = input("Select an option: ").strip()
+        choice = input(f"  {C}› {RST}").strip()
 
         if not choice.isdigit() or not (1 <= int(choice) <= len(options)):
-            print("Invalid choice, try again.")
+            print(f"{R}Invalid choice, try again.{RST}")
             continue
 
         action = options[int(choice) - 1][0]
@@ -144,19 +282,19 @@ def display_leaderboard():
         elif action == "next":
             page += 1
         elif action == "goto":
-            target = input(f"Enter page number (1-{total_pages}): ").strip()
+            target = input(f"  Enter page number (1-{total_pages}): ").strip()
             if target.isdigit() and 1 <= int(target) <= total_pages:
                 page = int(target) - 1
             else:
-                print(f"Invalid page number, must be between 1 and {total_pages}.")
+                print(f"{R}Invalid page number, must be between 1 and {total_pages}.{RST}")
         elif action == "search":
             _search_player(players)
             while True:
                 print()
-                print("1. Back to leaderboard")
-                print("2. Search player")
-                print("3. Back to main menu")
-                sub = input("Select an option: ").strip()
+                print(f"  {C}1.{RST} Back to leaderboard")
+                print(f"  {C}2.{RST} Search player")
+                print(f"  {C}3.{RST} Back to main menu")
+                sub = input(f"  {C}› {RST}").strip()
                 if sub == "1":
                     break
                 elif sub == "2":
@@ -164,112 +302,119 @@ def display_leaderboard():
                 elif sub == "3":
                     return
                 else:
-                    print("Invalid choice, try again.")
+                    print(f"{R}Invalid choice, try again.{RST}")
         elif action == "back":
             return
 
-# Input validation
+
+# ── Input validation ─────────────────────────────────────────────────────────
 def validate_credentials(username, password):
     if not username.strip():
-        print("Error: Username cannot be empty.")
+        print(f"{R}Error: Username cannot be empty.{RST}")
         return False
     if " " in username:
-        print("Error: Username cannot contain spaces.")
+        print(f"{R}Error: Username cannot contain spaces.{RST}")
         return False
     if not password.strip():
-        print("Error: Password cannot be empty.")
+        print(f"{R}Error: Password cannot be empty.{RST}")
         return False
     return True
 
-# Code handlers for string responses
+
+# ── Code handlers ─────────────────────────────────────────────────────────────
 def handle_register_code(code, username):
     if code == 0:
-        print("Registration Successful!")
+        print(f"{G}Registration Successful!{RST}")
     elif code == -1:
-        print(f"Error: Registration Failed: Username '{username}' is already taken.")
+        print(f"{R}Error: Username '{username}' is already taken.{RST}")
     elif code == -2:
-        print("Error: Registration Failed: Username cannot be empty.")
+        print(f"{R}Error: Username cannot be empty.{RST}")
     elif code == -3:
-        print("Error: Registration Failed: Password cannot be empty.")
+        print(f"{R}Error: Password cannot be empty.{RST}")
     else:
-        print("Error: Cannot connect to backend.")
+        print(f"{R}Error: Cannot connect to backend.{RST}")
+
 
 def handle_login_code(code):
     if code == 0:
-        print("Login successful!")
+        print(f"{G}Login successful!{RST}")
     elif code == -1:
-        print("Error: Login Failed: Username not found.")
+        print(f"{R}Error: Username not found.{RST}")
     elif code == -2:
-        print("Error: Login Failed: Incorrect password.")
+        print(f"{R}Error: Incorrect password.{RST}")
     else:
-        print("Error: Cannot connect to backend.")
+        print(f"{R}Error: Cannot connect to backend.{RST}")
+
 
 def handle_remove_code(code, username):
     if code == 0:
-        print(f"User '{username}' removed successfully.")
+        print(f"{G}User '{username}' removed successfully.{RST}")
     elif code == -1:
-        print(f"Error: No user with username '{username}' found.")
+        print(f"{R}Error: No user with username '{username}' found.{RST}")
     else:
-        print("Error: Cannot connect to backend.")
+        print(f"{R}Error: Cannot connect to backend.{RST}")
 
+
+# ── Main ──────────────────────────────────────────────────────────────────────
 def main():
+    global current_user
+    print(BANNER)
     try:
         while True:
-            choice = show_menu()
+            action = show_menu()
 
-            if choice == "1":
-                username = input("Username: ")
-                password = input("Password: ")
-
+            if action == "login":
+                username = input(f"  {C}Username: {RST}")
+                password = input(f"  {C}Password: {RST}")
                 if not validate_credentials(username, password):
                     continue
-
-                # Call to external module
                 result = login_user(username, password)
                 code = result["code"]
-
                 handle_login_code(code)
-
                 if code == 0:
-                    start_game(username)
+                    current_user = username
 
-            elif choice == "2":
-                username = input("New Username: ")
-                password = input("New Password: ")
-
+            elif action == "register":
+                username = input(f"  {C}New Username: {RST}")
+                password = input(f"  {C}New Password: {RST}")
                 if not validate_credentials(username, password):
                     continue
-
                 result = register_user(username, password)
                 code = result["code"]
-
                 handle_register_code(code, username)
 
-            elif choice == "3":
+            elif action == "start":
+                start_game(current_user)
+
+            elif action == "leaderboard":
                 display_leaderboard()
 
-            elif choice == "4":
-                print("Goodbye!")
+            elif action == "logout":
+                print(f"{G}Logged out. See you, {current_user}!{RST}")
+                current_user = None
+
+            elif action == "exit":
+                _typewriter(f"{Y}Goodbye! See you next time ~{RST}", delay=0.04)
                 sys.exit()
 
-            elif choice == "5":
-                print("Removing user...")
-                username = input("Username to remove: ")
+            elif action == "remove":
+                print(f"{DIM}Removing user...{RST}")
+                username = input(f"  {C}Username to remove: {RST}")
                 result = remove_user(username)
                 code = result["code"]
-
                 handle_remove_code(code, username)
 
             # TESTING CODE
-            elif choice == "6":
+            elif action == "test":
                 start_game("TEST USER")
             # TESTING CODE
 
             else:
-                print("Invalid choice, try again.")
+                print(f"{R}Invalid choice, try again.{RST}")
     except (KeyboardInterrupt, EOFError):
-        print("\nExiting...")
+        print(f"\n{Y}Exiting...{RST}")
         sys.exit(0)
+
 
 if __name__ == "__main__":
     main()
