@@ -3,18 +3,6 @@ from blessed import Terminal
 from gameObjects.obstacle import Obstacle
 from gameObjects.player import Player
 
-# Dimensions of the game area
-"""
-HEIGHT = 24
-WIDTH = 100
-"""
-
-# Header template for the game display
-# XX and YY are placeholders for score and high score, respectively
-HEADER = ("----------------------------------------------------------------------------------------------------\n"
-          "Score: XX                              Flappy Fisherman                               High Score: YY\n"
-          "----------------------------------------------------------------------------------------------------\n")
-
 # Renders the game state to the terminal
 # Parameters:
 # - player: Player object representing the player's character
@@ -24,14 +12,17 @@ HEADER = ("---------------------------------------------------------------------
 # - term: Terminal object from the blessed library for controlling terminal output
 def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int, term: Terminal):
     output = term.home
+    output += "\n"
 
-    # Addscore and high score to header
-    updated_header = HEADER.replace("XX", str(score) if score >= 10 else "0" + str(score)).replace("YY", str(high_score) if high_score >= 10 else "0" + str(high_score))
-    output += updated_header
+    # Create header with score and high score, centered around the game title
+    header = ("-" * term.width + "\n" +
+              f"Score: {str(score).rjust(3, '0')}" + " " * (term.width // 2 - 18) + "Flappy Fisherman" + " " * (term.width // 2 - 23) + f"High Score: {str(high_score).rjust(3, '0')}\n" +
+                "-" * term.width + "\n")
 
+    output += header
     #Temporary code for now!
     WIDTH = term.width
-    HEIGHT = term.height - 3
+    HEIGHT = term.height - len(header.split('\n')) - 1
     #Temporary code for now!
     
     # Draw the game area with player and obstacles
