@@ -52,4 +52,14 @@ class Project3aApplicationTests {
     assert (pc.register("WittyName", "") == -3);
     assert ((int) pc.login("WittyName", "").get("code") == -1);
   }
+
+  //Test if the score is updated properly if it is greater than previous values
+  @Test
+  void updateScoreTest(){
+    pc.register("WittyName", "pwd");
+    pc.updateScore("WittyName", 5);
+    assert (pc.getScore("WittyName"), 5);
+    pc.updateScore("WittyName", 7);
+    assert (pc.getScore("WittyName"), 7);
+  }
 }
