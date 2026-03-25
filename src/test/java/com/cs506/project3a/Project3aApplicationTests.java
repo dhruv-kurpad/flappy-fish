@@ -58,8 +58,8 @@ class Project3aApplicationTests {
   void updateScoreTest(){
     pc.register("WittyName", "pwd");
     pc.updateScore("WittyName", 5);
-    assert (pc.getScore("WittyName"), 5);
+    assert (pc.getScore("WittyName") == 5);
     pc.updateScore("WittyName", 7);
-    assert (pc.getScore("WittyName"), 7);
+    assert (pc.getScore("WittyName") == 7);
   }
 }
