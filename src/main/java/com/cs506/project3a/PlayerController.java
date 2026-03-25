@@ -155,7 +155,7 @@ public class PlayerController {
     if (player.isEmpty()) {
       return -1;
     }
-    return player.getHighScore();
+    return player.get().getHighScore();
   }
 
 }
