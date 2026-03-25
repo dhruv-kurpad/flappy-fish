@@ -122,11 +122,9 @@ def show_rules():
     choice = input(f"  {C}› {RST}").strip()
     if choice != "1":
         return False
-    for i in range(3, 0, -1):
-        print(f"\r  {Y}{BRT}Starting in {i}...{RST}   ", end="", flush=True)
-        time.sleep(1)
-    print(f"\r  {G}{BRT}GO!               {RST}")
-    time.sleep(0.3)
+    
+    # Removed old countdown and replaced with screen - Brock
+    
     return True
 
 
@@ -149,7 +147,9 @@ def start_game(username):
         print(f"{R}{'═' * 32}{RST}")
         choice = input(f"  {C}› {RST}").strip()
         if choice != "1":
-            return
+            return False
+        
+        return True
 
 
 # ── Leaderboard helpers ──────────────────────────────────────────────────────

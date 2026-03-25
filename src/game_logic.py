@@ -25,13 +25,33 @@ def start_game_logic(username):
 
     # --- Flap Cooldown State ---
     last_flap_time = 0.0
-    flap_cooldown = 0.25  # Requires 1/4 second between flaps
+    flap_cooldown = .75  # Required time in seconds between flaps
 
     is_running = True
 
     with term.fullscreen(), term.cbreak(), term.hidden_cursor():
         print(term.clear, end="", flush=True) 
         
+        # --- NEW PREGAME OVERLAY ---
+        draw(player, obstacles, score=0, high_score=0, term=term)
+        
+        popup = " PRESS SPACE BAR TO BEGIN "
+        x_pos = term.width // 2 - len(popup) // 2
+        y_pos = term.height // 2
+        print(term.move_xy(x_pos, y_pos) + term.black_on_cyan(popup), end="", flush=True)
+        
+        waiting = True
+        while waiting:
+            key = term.inkey() 
+            if key == ' ':
+                velocity = -1.5 
+                last_flap_time = time.time()
+                waiting = False
+            elif key.code == term.KEY_ESCAPE or key == 'q':
+                return 
+        # --- END PREGAME OVERLAY ---
+
+
         while is_running:
             prev_y = player.position[1]
 
