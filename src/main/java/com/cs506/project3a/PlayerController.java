@@ -144,12 +144,12 @@ public class PlayerController {
 
   /**
    * Returns the score for a player for testing purposes.
-   * 
+   *
    * @param name username 
    * @return score on success, -1 on user not found
    */
   @GetMapping("/getScore")
-  public int getScore(@RequestParam String name){ 
+  public int getScore(@RequestParam String name) { 
     Optional<Player> player = playerRepository.findByUsername(name);
     if (player.isEmpty()) {
       return -1;
