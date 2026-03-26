@@ -44,6 +44,15 @@ MEDALS = {
     3: f"{Fore.RED}{BRT}[3RD]{RST}",
 }
 
+CLEAR_SCREEN = "\033[2J\033[H"
+
+
+def clear_screen(show_banner=False):
+    # Use ANSI clear+home so each screen render starts from a clean frame.
+    print(CLEAR_SCREEN, end="", flush=True)
+    if show_banner:
+        print(BANNER)
+
 
 def _typewriter(text, delay=0.03):
     for ch in text:
@@ -54,6 +63,7 @@ def _typewriter(text, delay=0.03):
 
 # ── Display Menu ─────────────────────────────────────────────────────────────
 def show_menu():
+    clear_screen(show_banner=True)
     print(f"\n{Y}{'═' * 32}{RST}")
     print(f"  {Y}{BRT}        FLAPPY  FISH{RST}")
     print(f"{Y}{'═' * 32}{RST}")
@@ -94,6 +104,7 @@ def show_menu():
 
 # ── Game rules screen ────────────────────────────────────────────────────────
 def show_rules():
+    clear_screen()
     print(f"\n{C}{'═' * 42}{RST}")
     print(f"  {Y}{BRT}HOW TO PLAY{RST}")
     print(f"{C}{'═' * 42}{RST}")
@@ -130,15 +141,17 @@ def show_rules():
 
 # ── Core game logic function ─────────────────────────────────────────────────
 def start_game(username):
-    print()
+    clear_screen()
     _typewriter(f"{G}Welcome, {username}! Get ready...{RST}", delay=0.04)
     while True:
         if not show_rules():
             return
+        clear_screen()
         print(f"{Y}--- GAME STARTING ---{RST}")
         print(" (control options) ")
         start_game_logic(username)
 
+        clear_screen()
         print(f"\n{R}{'═' * 32}{RST}")
         print(f"  {R}{BRT}    GAME  OVER{RST}")
         print(f"{R}{'═' * 32}{RST}")
@@ -229,6 +242,7 @@ def _search_player(players):
 
 
 def display_leaderboard():
+    clear_screen()
     result = get_leaderboard()
 
     if not result["success"]:
@@ -251,6 +265,7 @@ def display_leaderboard():
     total_pages = (len(players) + PAGE_SIZE - 1) // PAGE_SIZE
 
     while True:
+        clear_screen()
         _print_leaderboard_page(players, page)
 
         has_prev = page > 0
@@ -298,6 +313,7 @@ def display_leaderboard():
                 if sub == "1":
                     break
                 elif sub == "2":
+                    clear_screen()
                     _search_player(players)
                 elif sub == "3":
                     return
@@ -358,7 +374,7 @@ def handle_remove_code(code, username):
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     global current_user
-    print(BANNER)
+    clear_screen(show_banner=True)
     try:
         while True:
             action = show_menu()
