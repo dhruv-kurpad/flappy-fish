@@ -4,6 +4,17 @@ from gameObjects.player import Player
 from gameObjects.obstacle import Obstacle
 from display import draw
 
+# --- COLLISION HELPER ---
+def check_collision(player, obs):
+    px, py = player.position
+    ox, oy = obs.position
+    
+    # Check if the player's bounding box overlaps with the obstacle's bounding box
+    overlap_x = px < ox + obs.width and px + player.width > ox
+    overlap_y = py < oy + obs.height and py + player.height > oy
+    
+    return overlap_x and overlap_y
+
 def start_game_logic(username):
     term = Terminal()
     
@@ -19,20 +30,20 @@ def start_game_logic(username):
     gravity = 0.15      
     velocity = 0.0
     
-    # Obstacle State (Track their X positions as floats for smooth scrolling)
+    # Obstacle State 
     obstacle_speed = 0.8
     obs_x_floats = [float(obs.position[0]) for obs in obstacles]
 
     # --- Flap Cooldown State ---
     last_flap_time = 0.0
-    flap_cooldown = .75  # Required time in seconds between flaps
+    flap_cooldown = .75  
 
     is_running = True
 
     with term.fullscreen(), term.cbreak(), term.hidden_cursor():
         print(term.clear, end="", flush=True) 
         
-        # --- NEW PREGAME OVERLAY ---
+        # --- PREGAME OVERLAY ---
         draw(player, obstacles, score=0, high_score=0, term=term)
         
         popup = " PRESS SPACE BAR TO BEGIN "
@@ -64,14 +75,12 @@ def start_game_logic(username):
             current_time = time.time()
             
             if key == ' ':
-                # Only apply velocity if the cooldown has passed
                 if current_time - last_flap_time > flap_cooldown:
                     velocity = -1.5 
                     last_flap_time = current_time
             elif key.code == term.KEY_ESCAPE or key == 'q':
                 is_running = False
                 
-            # Drain the input buffer: deletes any extra queued-up keystrokes
             while term.inkey(timeout=0):
                 pass
 
@@ -87,10 +96,8 @@ def start_game_logic(username):
             # 4. UPDATE PLAYER
             player._position = (player.position[0], int(bird_y_float))
 
-            # 5. UPDATE OBSTACLES (The Scrolling Logic)
+            # 5. UPDATE OBSTACLES & CHECK COLLISIONS
             for i, obs in enumerate(obstacles):
-                prev_obs_x = obs.position[0]
-                
                 # Move the obstacle left
                 obs_x_floats[i] -= obstacle_speed
                 new_x_int = int(obs_x_floats[i])
@@ -102,6 +109,10 @@ def start_game_logic(username):
                 
                 # Update object position
                 obs._position = (new_x_int, obs.position[1])
+
+                # --- COLLISION CHECK ---
+                if check_collision(player, obs):
+                    is_running = False
 
             # 6. RENDER
             draw(player, obstacles, score=0, high_score=0, term=term)
