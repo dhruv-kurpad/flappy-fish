@@ -60,6 +60,9 @@ def _typewriter(text, delay=0.03):
         time.sleep(delay)
     print()
 
+def pause_after_message():
+    input(f"\n{DIM}Press Enter to continue...{RST}")
+
 
 # ── Display Menu ─────────────────────────────────────────────────────────────
 def show_menu():
@@ -374,7 +377,6 @@ def handle_remove_code(code, username):
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     global current_user
-    clear_screen(show_banner=True)
     try:
         while True:
             action = show_menu()
@@ -383,21 +385,25 @@ def main():
                 username = input(f"  {C}Username: {RST}")
                 password = input(f"  {C}Password: {RST}")
                 if not validate_credentials(username, password):
+                    pause_after_message()
                     continue
                 result = login_user(username, password)
                 code = result["code"]
                 handle_login_code(code)
                 if code == 0:
                     current_user = username
+                pause_after_message()
 
             elif action == "register":
                 username = input(f"  {C}New Username: {RST}")
                 password = input(f"  {C}New Password: {RST}")
                 if not validate_credentials(username, password):
+                    pause_after_message()
                     continue
                 result = register_user(username, password)
                 code = result["code"]
                 handle_register_code(code, username)
+                pause_after_message()
 
             elif action == "start":
                 start_game(current_user)
@@ -408,6 +414,7 @@ def main():
             elif action == "logout":
                 print(f"{G}Logged out. See you, {current_user}!{RST}")
                 current_user = None
+                pause_after_message()
 
             elif action == "exit":
                 _typewriter(f"{Y}Goodbye! See you next time ~{RST}", delay=0.04)
@@ -419,6 +426,7 @@ def main():
                 result = remove_user(username)
                 code = result["code"]
                 handle_remove_code(code, username)
+                pause_after_message()
 
             # TESTING CODE
             elif action == "test":
@@ -427,6 +435,7 @@ def main():
 
             else:
                 print(f"{R}Invalid choice, try again.{RST}")
+                pause_after_message()
     except (KeyboardInterrupt, EOFError):
         print(f"\n{Y}Exiting...{RST}")
         sys.exit(0)
