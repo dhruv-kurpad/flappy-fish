@@ -61,6 +61,11 @@ def _typewriter(text, delay=0.03):
     print()
 
 
+def wait_to_clear():
+    """Wait before the next menu redraw so messages are not cleared immediately."""
+    input(f"\n  {DIM}Press Enter to continue...{RST}")
+
+
 # ── Display Menu ─────────────────────────────────────────────────────────────
 def show_menu():
     clear_screen(show_banner=True)
@@ -288,6 +293,7 @@ def display_leaderboard():
 
         if not choice.isdigit() or not (1 <= int(choice) <= len(options)):
             print(f"{R}Invalid choice, try again.{RST}")
+            wait_to_clear()
             continue
 
         action = options[int(choice) - 1][0]
@@ -302,6 +308,7 @@ def display_leaderboard():
                 page = int(target) - 1
             else:
                 print(f"{R}Invalid page number, must be between 1 and {total_pages}.{RST}")
+                wait_to_clear()
         elif action == "search":
             _search_player(players)
             while True:
@@ -319,6 +326,7 @@ def display_leaderboard():
                     return
                 else:
                     print(f"{R}Invalid choice, try again.{RST}")
+                    wait_to_clear()
         elif action == "back":
             return
 
@@ -327,12 +335,15 @@ def display_leaderboard():
 def validate_credentials(username, password):
     if not username.strip():
         print(f"{R}Error: Username cannot be empty.{RST}")
+        wait_to_clear()
         return False
     if " " in username:
         print(f"{R}Error: Username cannot contain spaces.{RST}")
+        wait_to_clear()
         return False
     if not password.strip():
         print(f"{R}Error: Password cannot be empty.{RST}")
+        wait_to_clear()
         return False
     return True
 
@@ -389,6 +400,7 @@ def main():
                 handle_login_code(code)
                 if code == 0:
                     current_user = username
+                wait_to_clear()
 
             elif action == "register":
                 username = input(f"  {C}New Username: {RST}")
@@ -398,6 +410,7 @@ def main():
                 result = register_user(username, password)
                 code = result["code"]
                 handle_register_code(code, username)
+                wait_to_clear()
 
             elif action == "start":
                 start_game(current_user)
@@ -408,6 +421,7 @@ def main():
             elif action == "logout":
                 print(f"{G}Logged out. See you, {current_user}!{RST}")
                 current_user = None
+                wait_to_clear()
 
             elif action == "exit":
                 _typewriter(f"{Y}Goodbye! See you next time ~{RST}", delay=0.04)
@@ -419,6 +433,7 @@ def main():
                 result = remove_user(username)
                 code = result["code"]
                 handle_remove_code(code, username)
+                wait_to_clear()
 
             # TESTING CODE
             elif action == "test":
@@ -427,6 +442,7 @@ def main():
 
             else:
                 print(f"{R}Invalid choice, try again.{RST}")
+                wait_to_clear()
     except (KeyboardInterrupt, EOFError):
         print(f"\n{Y}Exiting...{RST}")
         sys.exit(0)
