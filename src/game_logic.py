@@ -23,19 +23,19 @@ def start_game_logic(username):
     term = Terminal()
 
     # --- Create Game Objects ---
-    player = Player(10, term.height // 2)
+    player = Player(term.width // 2 - 7, term.height // 2)
     game_height = term.height - HEADER_LINES - 1
 
     obstacle_types = [
         ObstacleTypeConfig(
             name="static",
-            weight=0.6,
+            weight=1.0,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
         ),
         ObstacleTypeConfig(
             name="moving",
-            weight=0.4,
+            weight=0.0,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
             amplitude=4.0,
@@ -47,30 +47,30 @@ def start_game_logic(username):
         screen_width=term.width,
         game_height=game_height,
         obstacle_types=obstacle_types,
-        obstacle_speed=0.8,
-        gap_size=12,
+        obstacle_speed=1,
+        gap_size=16,
         spawn_interval=80,
         max_pairs=2,
     )
 
     # Game State
     bird_y_float = float(player.position[1])
-    gravity = 0.15
+    gravity = 0.5
     velocity = 0.0
 
     # --- Flap Cooldown State ---
     last_flap_time = 0.0
-    flap_cooldown = .75
+    flap_cooldown = .05
 
     # --- Bubble Display time --- #
     last_space_press = 0.0
-    bubble_display_time = 0.5  
+    bubble_display_time = 0.25  
     display_bubbles = False
 
     is_running = True
 
     with term.fullscreen(), term.cbreak(), term.hidden_cursor():
-        print(term.clear, end="", flush=True)
+        print(term.clear + term.hide_cursor, end="", flush=True)
 
         # --- PREGAME OVERLAY ---
         draw(player, spawner.obstacles, score=0, high_score=0, term=term, disp_bubbles=False)
@@ -83,14 +83,16 @@ def start_game_logic(username):
         while waiting:
             key = term.inkey()
             if key == ' ':
-                velocity = -1.5
+                velocity = -2.5
                 last_flap_time = time.time()
                 waiting = False
             elif key.code == term.KEY_ESCAPE or key == 'q':
                 return
         # --- END PREGAME OVERLAY ---
 
-
+        score = 0
+        passed_pairs = set()
+        just_increased_difficulty = False
         while is_running:
             prev_y = player.position[1]
 
@@ -104,7 +106,7 @@ def start_game_logic(username):
 
             if key == ' ':
                 if current_time - last_flap_time > flap_cooldown:
-                    velocity = -1.5
+                    velocity = -2.5
                     last_flap_time = current_time
                 last_space_press = current_time
                 display_bubbles = True
@@ -134,14 +136,39 @@ def start_game_logic(username):
             # 6. UPDATE BUBBLES
             if current_time - last_space_press > bubble_display_time:
                 display_bubbles = False
-            # 7. RENDER
-            draw(player, spawner.obstacles, score=0, high_score=0, term=term, disp_bubbles=display_bubbles)
+            # 7. UPDATE SCORE
+            active_pairs = set()
+            for top, bot in spawner._pairs:
+                pair_id = id(top)
+                active_pairs.add(pair_id)
+                pair_right_edge = top.position[0] + top.width
 
-            time.sleep(0.02)
+                if pair_right_edge < player.position[0] + player.width and pair_id not in passed_pairs:
+                    score += 1
+                    passed_pairs.add(pair_id)
+
+            passed_pairs.intersection_update(active_pairs)
+            # 8. Check for difficulty increase
+            if score % 5 == 0 and score > 0 and not just_increased_difficulty:
+                new_speed = spawner._speed + 0.2
+                spawner.update_obstacle_speed(new_speed)
+                just_increased_difficulty = True
+
+                if score % 10 == 0:
+                    for obs_type in spawner._types:
+                        if obs_type.name == "moving":
+                            new_weight = min(obs_type.weight + 0.1, 0.4)
+                            obs_type.update_weight(new_weight)
+            elif score % 5 != 0:
+                just_increased_difficulty = False
+            # 8. RENDER
+            draw(player, spawner.obstacles, score=score, high_score=0, term=term, disp_bubbles=display_bubbles)
+
+            time.sleep(0.01)
 
         # Game Over Pause
         game_over_text = " GAME OVER! "
         print(term.move_xy(term.width // 2 - len(game_over_text) // 2, term.height // 2) + term.red_on_black(game_over_text), end="", flush=True)
         time.sleep(2)
 
-    print(term.clear, end="", flush=True)
+    print(term.clear + term.hide_cursor, end="", flush=True)

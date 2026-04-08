@@ -32,6 +32,10 @@ class ObstacleTypeConfig:
     # How fast the sine wave advances each frame (only matters if amplitude > 0).
     frequency: float = 0.05  # radians per frame
 
+    def update_weight(self, new_weight: float) -> None:
+        """Allows dynamic weight changes"""
+        self.weight = new_weight
+
 
 class ObstacleSpawner:
     """Owns all moving obstacle pairs: scrolling, spawning, and pruning."""
@@ -164,3 +168,7 @@ class ObstacleSpawner:
         )
 
         self._pairs.append((top, bot))
+    
+    def update_obstacle_speed(self, new_speed: float) -> None:
+        """Allows dynamic speed changes"""
+        self._speed = new_speed
