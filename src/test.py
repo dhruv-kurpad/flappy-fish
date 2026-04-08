@@ -14,11 +14,11 @@ class TestFrontend(unittest.TestCase):
         self.assertEqual(True, True)
     
     def test_Sprite(self):
-        sprite = Sprite("assets/fish.txt")
+        sprite = Sprite(Path(__file__).resolve().parent / "assets" / "fish.txt")
         self.assertTrue(isinstance(sprite.display, list))
     
     def test_sprite_content(self):
-        sprite = Sprite("assets/fish.txt")
+        sprite = Sprite(Path(__file__).resolve().parent / "assets" / "fish.txt")
         expected_sprite = [
             ['\\', ';', ',', ' ', ' ', ' ', ' ', ',', ';', '\\', '\\', ',', ';', ' ', ' '],
             [' ', '\\', '\\', '\\', ';', ';', ':', ':', ':', ':', ':', ':', ':', 'o', ' '],
