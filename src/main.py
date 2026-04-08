@@ -237,9 +237,15 @@ def _typewrite_option(prefix: str, label: str, delay: float = 0.018):
     sys.stdout.write("\n")
     sys.stdout.flush()
 
-def pause_after_message():
-    input(f"\n{DIM}Press Enter to continue...{RST}")
+def _input_with_sfx(prompt: str = "") -> str:
+    """Plain input() that plays a button click sound when Enter is pressed."""
+    val = input(prompt)
     _play_sfx("button_click")
+    return val
+
+
+def pause_after_message():
+    _input_with_sfx(f"\n{DIM}Press Enter to continue...{RST}")
 
 
 
@@ -413,7 +419,7 @@ def _print_leaderboard_page(players, page, highlight_username=None):
 
 
 def _search_player(players):
-    username = input(f"  {C}Enter username to search: {RST}").strip()
+    username = _input_with_sfx(f"  {C}Enter username to search: {RST}").strip()
     if not username:
         print(f"{R}No username entered.{RST}")
         return
@@ -459,8 +465,7 @@ def display_leaderboard():
         print(f"\n{R}{'═' * 38}{RST}")
         print(f"{R}Error: {result['message']}{RST}")
         print(f"{R}{'═' * 38}{RST}\n")
-        input("Press Enter to return to menu...")
-        _play_sfx("button_click")
+        _input_with_sfx("Press Enter to return to menu...")
         return
 
     players = result["players"]
@@ -469,8 +474,7 @@ def display_leaderboard():
         print(f"\n{Y}{'═' * 38}{RST}")
         print("  No leaderboard data available yet.")
         print(f"{Y}{'═' * 38}{RST}\n")
-        input("Press Enter to return to menu...")
-        _play_sfx("button_click")
+        _input_with_sfx("Press Enter to return to menu...")
         return
 
     page = 0
@@ -509,7 +513,7 @@ def display_leaderboard():
         elif action == "next":
             page += 1
         elif action == "goto":
-            target = input(f"  Enter page number (1-{total_pages}): ").strip()
+            target = _input_with_sfx(f"  Enter page number (1-{total_pages}): ").strip()
             if target.isdigit() and 1 <= int(target) <= total_pages:
                 page = int(target) - 1
             else:
@@ -592,8 +596,8 @@ def main():
             action = show_menu()
 
             if action == "login":
-                username = input(f"  {C}Username: {RST}")
-                password = input(f"  {C}Password: {RST}")
+                username = _input_with_sfx(f"  {C}Username: {RST}")
+                password = _input_with_sfx(f"  {C}Password: {RST}")
                 if not validate_credentials(username, password):
                     pause_after_message()
                     continue
@@ -605,8 +609,8 @@ def main():
                 pause_after_message()
 
             elif action == "register":
-                username = input(f"  {C}New Username: {RST}")
-                password = input(f"  {C}New Password: {RST}")
+                username = _input_with_sfx(f"  {C}New Username: {RST}")
+                password = _input_with_sfx(f"  {C}New Password: {RST}")
                 if not validate_credentials(username, password):
                     pause_after_message()
                     continue
@@ -632,7 +636,7 @@ def main():
 
             elif action == "remove":
                 print(f"{DIM}Removing user...{RST}")
-                username = input(f"  {C}Username to remove: {RST}")
+                username = _input_with_sfx(f"  {C}Username to remove: {RST}")
                 result = remove_user(username)
                 code = result["code"]
                 handle_remove_code(code, username)
