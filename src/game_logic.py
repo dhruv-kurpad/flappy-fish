@@ -62,14 +62,18 @@ def start_game_logic(username):
     last_flap_time = 0.0
     flap_cooldown = .75
 
+    # --- Bubble Display time --- #
+    last_space_press = 0.0
+    bubble_display_time = 0.5  
+    display_bubbles = False
+
     is_running = True
 
     with term.fullscreen(), term.cbreak(), term.hidden_cursor():
         print(term.clear, end="", flush=True)
 
         # --- PREGAME OVERLAY ---
-        draw(player, spawner.obstacles, score=0, high_score=0, term=term)
-
+        draw(player, spawner.obstacles, score=0, high_score=0, term=term, disp_bubbles=False)
         popup = " PRESS SPACE BAR TO BEGIN "
         x_pos = term.width // 2 - len(popup) // 2
         y_pos = term.height // 2
@@ -102,6 +106,8 @@ def start_game_logic(username):
                 if current_time - last_flap_time > flap_cooldown:
                     velocity = -1.5
                     last_flap_time = current_time
+                last_space_press = current_time
+                display_bubbles = True
             elif key.code == term.KEY_ESCAPE or key == 'q':
                 is_running = False
 
@@ -125,9 +131,11 @@ def start_game_logic(username):
             for obs in spawner.obstacles:
                 if check_collision(player, obs):
                     is_running = False
-
-            # 6. RENDER
-            draw(player, spawner.obstacles, score=0, high_score=0, term=term)
+            # 6. UPDATE BUBBLES
+            if current_time - last_space_press > bubble_display_time:
+                display_bubbles = False
+            # 7. RENDER
+            draw(player, spawner.obstacles, score=0, high_score=0, term=term, disp_bubbles=display_bubbles)
 
             time.sleep(0.02)
 

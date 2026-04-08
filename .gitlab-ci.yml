@@ -32,6 +32,7 @@ unit_test_frontend:
     - cs506
   image: python
   script:
+    - pip install -r src/requirements.txt
     - python src/test.py 2>&1 | tee results.log
   rules:
     - changes:

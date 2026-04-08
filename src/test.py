@@ -14,11 +14,11 @@ class TestFrontend(unittest.TestCase):
         self.assertEqual(True, True)
     
     def test_Sprite(self):
-        sprite = Sprite("assets/fish.txt")
+        sprite = Sprite(Path(__file__).resolve().parent / "assets" / "fish.txt")
         self.assertTrue(isinstance(sprite.display, list))
     
     def test_sprite_content(self):
-        sprite = Sprite("assets/fish.txt")
+        sprite = Sprite(Path(__file__).resolve().parent / "assets" / "fish.txt")
         expected_sprite = [
             ['\\', ';', ',', ' ', ' ', ' ', ' ', ',', ';', '\\', '\\', ',', ';', ' ', ' '],
             [' ', '\\', '\\', '\\', ';', ';', ':', ':', ':', ':', ':', ':', ':', 'o', ' '],
@@ -67,7 +67,7 @@ class TestFrontend(unittest.TestCase):
         high_score = 8
         obstacles = [Obstacle(70, 19, False), Obstacle(70, -5, True)]
         try:
-            draw(player, obstacles, score, high_score, term)
+            draw(player, obstacles, score, high_score, term, disp_bubbles=False)
             self.assertTrue(True)  # If no exceptions are raised, the test passes
         except Exception as e:
             self.fail(f"draw() raised an exception: {e}")
