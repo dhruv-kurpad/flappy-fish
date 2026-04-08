@@ -1,7 +1,10 @@
+from pathlib import Path
 from typing import List, Tuple
 from blessed import Terminal
 from gameObjects.obstacle import Obstacle
 from gameObjects.player import Player
+
+_ASSETS = Path(__file__).resolve().parent / "assets"
 
 # Renders the game state to the terminal
 # Parameters:
@@ -45,6 +48,8 @@ if __name__ == "__main__":
     player = Player(10.4, 5.5)
     score = 10
     high_score = 8
-    obstacles = [Obstacle(70, 19, False), Obstacle(70, -5, True)]
+    obstacles = [
+        Obstacle(70, 19, str(_ASSETS / "tentacles_bottom.txt")),
+        Obstacle(70, -5, str(_ASSETS / "tentacles_top.txt")),
+    ]
     draw(player, obstacles, score, high_score, term)
-    
