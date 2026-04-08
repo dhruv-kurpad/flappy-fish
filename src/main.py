@@ -238,41 +238,8 @@ def _typewrite_option(prefix: str, label: str, delay: float = 0.018):
     sys.stdout.flush()
 
 def _input_with_sfx(prompt: str = "") -> str:
-    """Input with blinking ><> fish cursor and button click SFX on Enter."""
-    stop = threading.Event()
-    states = [
-        f"{Y}{BRT}><>{RST}",
-        "   ",
-        f"{C}{BRT}><>{RST}",
-        "   ",
-    ]
-    # Separate leading newlines from the prompt body, then strip caller indentation
-    body = prompt.lstrip("\n")
-    leading_newlines = "\n" * (len(prompt) - len(body))
-    body = body.lstrip(" ")
-
-    if leading_newlines:
-        sys.stdout.write(leading_newlines)
-        sys.stdout.flush()
-
-    # Write only the fish; let input(body) write the prompt and place the cursor after it
-    sys.stdout.write(f"  {states[0]} ")
-    sys.stdout.flush()
-
-    def _animate():
-        tick = 0
-        while not stop.is_set():
-            time.sleep(0.25)
-            tick += 1
-            fish = states[tick % len(states)]
-            sys.stdout.write(f"\033[s\r\033[2C{fish}\033[u")
-            sys.stdout.flush()
-
-    t = threading.Thread(target=_animate, daemon=True)
-    t.start()
-    val = input(body).strip()
-    stop.set()
-    t.join(timeout=0.4)
+    """Plain input() that plays a button click sound when Enter is pressed."""
+    val = input(prompt)
     _play_sfx("button_click")
     return val
 
@@ -283,7 +250,7 @@ def pause_after_message():
 
 
 # ── Display Menu ─────────────────────────────────────────────────────────────
-def _draw_menu(options, selected_idx=None, selected_label=None, animate=False):
+def _draw_menu(options, selected_idx=None, animate=False):
     """Render the full menu. When selected_idx is set, box that option."""
     clear_screen(show_banner=True)
     print(f"\n{Y}{'═' * 32}{RST}")
@@ -308,9 +275,6 @@ def _draw_menu(options, selected_idx=None, selected_label=None, animate=False):
 
     print(f"  {DIM}{len(options) + 1}. Remove User (DEBUG){RST}")
     print(f"{Y}{'═' * 32}{RST}")
-
-    if selected_label is not None:
-        print(f"  {C}›{RST} {Y}{BRT}{selected_label}{RST}")
 
 
 def show_menu():
@@ -344,7 +308,7 @@ def show_menu():
         action = options[selected_idx][0]
 
         _play_sfx("button_click")
-        _draw_menu(options, selected_idx=selected_idx, selected_label=action)
+        _draw_menu(options, selected_idx=selected_idx)
         time.sleep(0.25)
         return action
 
