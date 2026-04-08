@@ -35,11 +35,29 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
                 obs = next(obs for obs in obstacles if x >= round(obs.position[0]) and x < round(obs.position[0]) + obs.width and y >= round(obs.position[1]) and y < round(obs.position[1]) + obs.height)
                 line += f"{term.green}{obs.sprite.display[y - round(obs.position[1])][x - round(obs.position[0])]}{term.normal}"
             # Draw Bubbles
-            elif x == round(player.position[0]) + player.width + 2 and y == round(player.position[1]) + (player.height/2) and disp_bubbles:
+            elif x == round(player.position[0]) + player.width + 2 and y == round(player.position[1]) + round(player.height/2) and disp_bubbles:
                 line += "o"
-            elif x == round(player.position[0]) + player.width + 4 and y == round(player.position[1]) + (player.height/2) - 2 and disp_bubbles:
+            elif x == round(player.position[0]) + player.width + 4 and y == round(player.position[1]) + round(player.height/2) - 2 and disp_bubbles:
                 line += "o"
-            elif x == round(player.position[0]) + player.width + 5 and y == round(player.position[1]) + (player.height/2) - 6 and disp_bubbles:
+            elif x == round(player.position[0]) + player.width + 5 and y == round(player.position[1]) + round(player.height/2) - 6 and disp_bubbles:
+                line += "o"
+            elif x == round(player.position[0]) and y == round(player.position[1]) + player.height + 2 and disp_bubbles:
+                line += "o"
+            elif x == round(player.position[0]) - 1 and y == round(player.position[1]) + player.height + 4 and disp_bubbles:
+                line += "o"
+            elif x == round(player.position[0]) - 2 and y == round(player.position[1]) + player.height + 6 and disp_bubbles:
+                line += "o"
+            elif x == round(player.position[0]) + round(player.width/2) and y == round(player.position[1]) + player.height + 2 and disp_bubbles:
+                line += "o"
+            elif x == round(player.position[0]) + round(player.width/2) and y == round(player.position[1]) + player.height + 4 and disp_bubbles:
+                line += "o"
+            elif x == round(player.position[0]) + round(player.width/2) and y == round(player.position[1]) + player.height + 6 and disp_bubbles:
+                line += "o"
+            elif x == round(player.position[0]) + player.width and y == round(player.position[1]) + round(player.height) + 2 and disp_bubbles:
+                line += "o"
+            elif x == round(player.position[0]) + player.width + 1 and y == round(player.position[1]) + round(player.height) + 4 and disp_bubbles:
+                line += "o"
+            elif x == round(player.position[0]) + player.width + 2 and y == round(player.position[1]) + round(player.height) + 6 and disp_bubbles:
                 line += "o"
             else:
                 line += " "
