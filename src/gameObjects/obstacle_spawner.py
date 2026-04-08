@@ -111,7 +111,6 @@ class ObstacleSpawner:
         # % is remainder: True when frame_counter is 80, 160, 240, ... if interval is 80.
         if (
             self._frame_counter % self._spawn_interval == 0
-            and len(self._pairs) < self._max_pairs
         ):
             self._spawn_pair()
 
@@ -135,8 +134,8 @@ class ObstacleSpawner:
         # Pick a random vertical position for the gap center so each pair feels different.
         # half_gap is half the gap in rows; // is integer division (whole number).
         half_gap = self._gap_size // 2
-        lo = top_h + half_gap + 1
-        hi = self._game_height - bot_h - half_gap - 1
+        lo = half_gap + 1
+        hi = self._game_height - half_gap - 1
         if lo >= hi:
             # Screen too small for the math; use a simpler minimum range.
             lo = top_h + 1
@@ -172,3 +171,7 @@ class ObstacleSpawner:
     def update_obstacle_speed(self, new_speed: float) -> None:
         """Allows dynamic speed changes"""
         self._speed = new_speed
+    
+    def update_spawn_interval(self, new_interval: int) -> None:
+        """Allows dynamic spawn interval changes"""
+        self._spawn_interval = new_interval

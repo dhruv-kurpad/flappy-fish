@@ -149,17 +149,19 @@ def start_game_logic(username):
 
             passed_pairs.intersection_update(active_pairs)
             # 8. Check for difficulty increase
-            if score % 5 == 0 and score > 0 and not just_increased_difficulty:
+            if score % 10 == 0 and score > 0 and not just_increased_difficulty:
                 new_speed = spawner._speed + 0.2
+                new_interval = max(30, spawner._spawn_interval - 4)
                 spawner.update_obstacle_speed(new_speed)
+                spawner.update_spawn_interval(new_interval)
                 just_increased_difficulty = True
 
-                if score % 10 == 0:
+                if score % 20 == 0:
                     for obs_type in spawner._types:
                         if obs_type.name == "moving":
                             new_weight = min(obs_type.weight + 0.1, 0.4)
                             obs_type.update_weight(new_weight)
-            elif score % 5 != 0:
+            elif score % 10 != 0:
                 just_increased_difficulty = False
             # 8. RENDER
             draw(player, spawner.obstacles, score=score, high_score=0, term=term, disp_bubbles=display_bubbles)
