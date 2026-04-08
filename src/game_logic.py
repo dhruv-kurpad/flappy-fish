@@ -1,38 +1,62 @@
 from blessed import Terminal
 import time
+from pathlib import Path
 from gameObjects.player import Player
-from gameObjects.obstacle import Obstacle
+from gameObjects.obstacle_spawner import ObstacleSpawner, ObstacleTypeConfig
 from display import draw
+
+ASSETS = Path(__file__).resolve().parent / "assets"
+HEADER_LINES = 4  # number of lines the header occupies in display.py
 
 # --- COLLISION HELPER ---
 def check_collision(player, obs):
     px, py = player.position
     ox, oy = obs.position
-    
+
     # Check if the player's bounding box overlaps with the obstacle's bounding box
     overlap_x = px < ox + obs.width and px + player.width > ox
     overlap_y = py < oy + obs.height and py + player.height > oy
-    
+
     return overlap_x and overlap_y
 
 def start_game_logic(username):
     term = Terminal()
-    
+
     # --- Create Game Objects ---
     player = Player(10, term.height // 2)
-    obstacles = [
-        Obstacle(term.width - 25, 0, top=True),
-        Obstacle(term.width - 25, term.height - 12, top=False) 
+    game_height = term.height - HEADER_LINES - 1
+
+    obstacle_types = [
+        ObstacleTypeConfig(
+            name="static",
+            weight=0.6,
+            top_sprite=str(ASSETS / "tentacles_top.txt"),
+            bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
+        ),
+        ObstacleTypeConfig(
+            name="moving",
+            weight=0.4,
+            top_sprite=str(ASSETS / "tentacles_top.txt"),
+            bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
+            amplitude=4.0,
+            frequency=0.05,
+        ),
     ]
-    
-    # Game State 
+
+    spawner = ObstacleSpawner(
+        screen_width=term.width,
+        game_height=game_height,
+        obstacle_types=obstacle_types,
+        obstacle_speed=0.8,
+        gap_size=12,
+        spawn_interval=80,
+        max_pairs=2,
+    )
+
+    # Game State
     bird_y_float = float(player.position[1])
-    gravity = 0.15      
+    gravity = 0.15
     velocity = 0.0
-    
-    # Obstacle State 
-    obstacle_speed = 0.8
-    obs_x_floats = [float(obs.position[0]) for obs in obstacles]
 
     # --- Flap Cooldown State ---
     last_flap_time = 0.0
@@ -46,25 +70,24 @@ def start_game_logic(username):
     is_running = True
 
     with term.fullscreen(), term.cbreak(), term.hidden_cursor():
-        print(term.clear, end="", flush=True) 
-        
+        print(term.clear, end="", flush=True)
+
         # --- PREGAME OVERLAY ---
-        draw(player, obstacles, score=0, high_score=0, term=term, disp_bubbles=False)
-        
+        draw(player, spawner.obstacles, score=0, high_score=0, term=term, disp_bubbles=False)
         popup = " PRESS SPACE BAR TO BEGIN "
         x_pos = term.width // 2 - len(popup) // 2
         y_pos = term.height // 2
         print(term.move_xy(x_pos, y_pos) + term.black_on_cyan(popup), end="", flush=True)
-        
+
         waiting = True
         while waiting:
-            key = term.inkey() 
+            key = term.inkey()
             if key == ' ':
-                velocity = -1.5 
+                velocity = -1.5
                 last_flap_time = time.time()
                 waiting = False
             elif key.code == term.KEY_ESCAPE or key == 'q':
-                return 
+                return
         # --- END PREGAME OVERLAY ---
 
 
@@ -74,28 +97,28 @@ def start_game_logic(username):
             # 1. PHYSICS UPDATE (Player)
             velocity += gravity
             bird_y_float += velocity
-            
+
             # 2. INPUT
-            key = term.inkey(timeout=0.03) 
+            key = term.inkey(timeout=0.03)
             current_time = time.time()
-            
+
             if key == ' ':
                 if current_time - last_flap_time > flap_cooldown:
-                    velocity = -1.5 
+                    velocity = -1.5
                     last_flap_time = current_time
                 last_space_press = current_time
                 display_bubbles = True
             elif key.code == term.KEY_ESCAPE or key == 'q':
                 is_running = False
-                
+
             while term.inkey(timeout=0):
                 pass
 
             # 3. BOUNDARY CHECKS (Player)
             if bird_y_float >= term.height - player.height:
                 bird_y_float = float(term.height - player.height)
-                is_running = False 
-            
+                is_running = False
+
             if bird_y_float < 1:
                 bird_y_float = 1.0
                 velocity = 0
@@ -104,33 +127,21 @@ def start_game_logic(username):
             player._position = (player.position[0], int(bird_y_float))
 
             # 5. UPDATE OBSTACLES & CHECK COLLISIONS
-            for i, obs in enumerate(obstacles):
-                # Move the obstacle left
-                obs_x_floats[i] -= obstacle_speed
-                new_x_int = int(obs_x_floats[i])
-                
-                # If it moves off the left edge, respawn it on the right
-                if new_x_int <= 1:
-                    obs_x_floats[i] = float(term.width - obs.width - 2)
-                    new_x_int = int(obs_x_floats[i])
-                
-                # Update object position
-                obs._position = (new_x_int, obs.position[1])
-
-                # --- COLLISION CHECK ---
+            spawner.update()
+            for obs in spawner.obstacles:
                 if check_collision(player, obs):
                     is_running = False
             # 6. UPDATE BUBBLES
             if current_time - last_space_press > bubble_display_time:
                 display_bubbles = False
             # 7. RENDER
-            draw(player, obstacles, score=0, high_score=0, term=term, disp_bubbles=display_bubbles)
+            draw(player, spawner.obstacles, score=0, high_score=0, term=term, disp_bubbles=display_bubbles)
 
             time.sleep(0.02)
 
         # Game Over Pause
         game_over_text = " GAME OVER! "
         print(term.move_xy(term.width // 2 - len(game_over_text) // 2, term.height // 2) + term.red_on_black(game_over_text), end="", flush=True)
-        time.sleep(2) 
+        time.sleep(2)
 
     print(term.clear, end="", flush=True)
