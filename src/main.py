@@ -255,7 +255,8 @@ def _input_with_sfx(prompt: str = "") -> str:
         sys.stdout.write(leading_newlines)
         sys.stdout.flush()
 
-    sys.stdout.write(f"  {states[0]} {body}")
+    # Write only the fish; let input(body) write the prompt and place the cursor after it
+    sys.stdout.write(f"  {states[0]} ")
     sys.stdout.flush()
 
     def _animate():
@@ -269,7 +270,7 @@ def _input_with_sfx(prompt: str = "") -> str:
 
     t = threading.Thread(target=_animate, daemon=True)
     t.start()
-    val = input("").strip()
+    val = input(body).strip()
     stop.set()
     t.join(timeout=0.4)
     _play_sfx("button_click")
