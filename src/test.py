@@ -5,7 +5,7 @@ from pathlib import Path
 from gameObjects.obstacle import Obstacle
 from gameObjects.player import Player
 from gameObjects.sprite import Sprite
-from display import draw
+from display import _ASSETS, draw
 
 class TestFrontend(unittest.TestCase):
 
@@ -41,22 +41,22 @@ class TestFrontend(unittest.TestCase):
         self.assertEqual(player.sprite.display, expected_sprite)
     
     def test_obstacle(self):
-        obstacle_bottom = Obstacle(70, 10, False)
+        obstacle_bottom = Obstacle(70, 10, str(_ASSETS / "tentacles_bottom.txt"))
         self.assertTrue(isinstance(obstacle_bottom, Obstacle))
-        obstacle_top = Obstacle(70, -5, True)
+        obstacle_top = Obstacle(70, -5, str(_ASSETS / "tentacles_top.txt"))
         self.assertTrue(isinstance(obstacle_top, Obstacle))
     
     def test_obstacle_position(self):
-        obstacle_bottom = Obstacle(70, 10, False)
+        obstacle_bottom = Obstacle(70, 10, str(_ASSETS / "tentacles_bottom.txt"))
         self.assertEqual(obstacle_bottom.position, (70, 10))
-        obstacle_top = Obstacle(70, -5, True)
+        obstacle_top = Obstacle(70, -5, str(_ASSETS / "tentacles_top.txt"))
         self.assertEqual(obstacle_top.position, (70, -5))
     
     def test_obstacle_sprite(self):
-        obstacle_bottom = Obstacle(70, 10, False)
+        obstacle_bottom = Obstacle(70, 10, str(_ASSETS / "tentacles_bottom.txt"))
         expected_sprite_bottom = Sprite(Path(__file__).resolve().parent / "assets" / "tentacles_bottom.txt").display
         self.assertEqual(obstacle_bottom.sprite.display, expected_sprite_bottom)
-        obstacle_top = Obstacle(70, -5, True)
+        obstacle_top = Obstacle(70, -5, str(_ASSETS / "tentacles_top.txt"))
         expected_sprite_top = Sprite(Path(__file__).resolve().parent / "assets" / "tentacles_top.txt").display
         self.assertEqual(obstacle_top.sprite.display, expected_sprite_top)
     
@@ -65,7 +65,7 @@ class TestFrontend(unittest.TestCase):
         player = Player(10.4, 5.5)
         score = 10
         high_score = 8
-        obstacles = [Obstacle(70, 19, False), Obstacle(70, -5, True)]
+        obstacles = [Obstacle(70, 19, str(_ASSETS / "tentacles_bottom.txt")), Obstacle(70, -5, str(_ASSETS / "tentacles_top.txt"))]
         try:
             draw(player, obstacles, score, high_score, term, disp_bubbles=False)
             self.assertTrue(True)  # If no exceptions are raised, the test passes
