@@ -1,5 +1,9 @@
 import sys
 import time
+import random
+import subprocess
+import threading
+from pathlib import Path
 from auth import login_user, register_user, remove_user, get_leaderboard
 from game_logic import start_game_logic
 from colorama import init, Fore, Style
@@ -36,6 +40,167 @@ BANNER = (
 
 current_user = None
 
+_ASSETS = Path(__file__).resolve().parent / "assets"
+_SOUNDS = _ASSETS / "sounds"
+
+
+def _play_sfx(name: str):
+    """Play a WAV sound file asynchronously. Works on macOS, Windows, and Linux."""
+    path = _SOUNDS / f"{name}.wav"
+    if not path.exists():
+        return
+
+    if sys.platform == "darwin":
+        cmd = ["afplay", str(path)]
+        threading.Thread(
+            target=lambda: subprocess.run(cmd, capture_output=True),
+            daemon=True,
+        ).start()
+    elif sys.platform == "win32":
+        import winsound
+        threading.Thread(
+            target=lambda: winsound.PlaySound(str(path), winsound.SND_FILENAME),
+            daemon=True,
+        ).start()
+    else:  # Linux
+        cmd = ["aplay", str(path)]
+        threading.Thread(
+            target=lambda: subprocess.run(cmd, capture_output=True),
+            daemon=True,
+        ).start()
+
+
+def _animated_input() -> str:
+    """Blinking ><> fish as the prompt cursor: yellow → blank → cyan → blank → …"""
+    stop = threading.Event()
+
+    # Four states, 0.25 s each: yellow fish, blank, cyan fish, blank
+    states = [
+        f"{Y}{BRT}><>{RST}",
+        "   ",
+        f"{C}{BRT}><>{RST}",
+        "   ",
+    ]
+
+    # Print initial prompt: 2-space indent + yellow fish + 1 space
+    sys.stdout.write(f"  {states[0]} ")
+    sys.stdout.flush()
+
+    def _animate():
+        tick = 0
+        while not stop.is_set():
+            time.sleep(0.25)
+            tick += 1
+            fish = states[tick % len(states)]
+            # Save cursor → jump to fish position (col 3) → rewrite → restore
+            sys.stdout.write(f"\033[s\r\033[2C{fish}\033[u")
+            sys.stdout.flush()
+
+    t = threading.Thread(target=_animate, daemon=True)
+    t.start()
+
+    val = input("").strip()   # prompt already printed above
+
+    stop.set()
+    t.join(timeout=0.4)
+
+    return val
+
+
+def _menu_input() -> str:
+    """Animated-input wrapper that plays a button click sound on Enter."""
+    val = _animated_input()
+    _play_sfx("button_click")
+    return val
+
+
+# ── Intro Animation ───────────────────────────────────────────────────────────
+def show_intro():
+    from blessed import Terminal
+
+    with open(_ASSETS / "fish.txt") as f:
+        fish_lines = [line.rstrip('\n') for line in f]
+
+    fish_width = max(len(line) for line in fish_lines)
+    fish_height = len(fish_lines)
+
+    term = Terminal()
+
+    # Physics state
+    fish_x    = float(-fish_width)
+    fish_y    = float(term.height // 2 - fish_height // 2)
+    velocity  = -2.0
+    gravity   = 0.20
+    speed     = 1.5
+    flap_every = 12   # auto-flap every N frames
+
+    bubbles = []      # each entry: [x, y, lifetime]
+    frame   = 0
+
+    with term.fullscreen(), term.cbreak(), term.hidden_cursor():
+        while int(fish_x) < term.width:
+            # ── Physics ──────────────────────────────────────────────────────
+            velocity += gravity
+            fish_y   += velocity
+            fish_x   += speed
+
+            if frame % flap_every == 0:
+                velocity = -2.0
+
+            # vertical clamp
+            if fish_y < 0:
+                fish_y   = 0.0
+                velocity = 0.5
+            if fish_y > term.height - fish_height - 1:
+                fish_y   = float(term.height - fish_height - 1)
+                velocity = -2.0
+
+            # ── Emit bubble behind the fish ───────────────────────────────────
+            if frame % 3 == 0 and int(fish_x) > 0:
+                bubbles.append([
+                    int(fish_x) - 2,
+                    int(fish_y) + fish_height // 2 + random.randint(-1, 1),
+                    15,
+                ])
+
+            bubbles = [[x, y, lt - 1] for x, y, lt in bubbles if lt > 0]
+
+            # ── Render ────────────────────────────────────────────────────────
+            W = term.width
+            H = term.height - 1
+            out = [term.clear]
+
+            # skip hint at bottom
+            hint = f"{DIM}Press any key to skip{RST}"
+            out.append(term.move_xy(0, H) + hint)
+
+            # bubbles — cyan, matching the "FISH" half of the banner
+            for bx, by, _ in bubbles:
+                if 0 <= bx < W and 0 <= by < H:
+                    out.append(term.move_xy(bx, by) + term.cyan + "o" + term.normal)
+
+            # fish — yellow bold, matching the "FLAPPY" half of the banner
+            fy, fx = int(fish_y), int(fish_x)
+            for i, line in enumerate(fish_lines):
+                y = fy + i
+                if 0 <= y < H:
+                    x_start = max(0, fx)
+                    offset  = max(0, -fx)
+                    visible = line[offset: offset + max(0, W - x_start)]
+                    if visible and x_start < W:
+                        out.append(
+                            term.move_xy(x_start, y) +
+                            term.yellow + term.bold + visible + term.normal
+                        )
+
+            print("".join(out), end="", flush=True)
+
+            frame += 1
+
+            if term.inkey(timeout=0.04):
+                break
+
+
 PAGE_SIZE = 10
 
 MEDALS = {
@@ -60,12 +225,27 @@ def _typewriter(text, delay=0.03):
         time.sleep(delay)
     print()
 
+
+def _typewrite_option(prefix: str, label: str, delay: float = 0.018):
+    """Print one menu option: prefix (with colour codes) instantly, label char-by-char."""
+    sys.stdout.write(prefix)
+    sys.stdout.flush()
+    for ch in label:
+        sys.stdout.write(ch)
+        sys.stdout.flush()
+        time.sleep(delay)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+
 def pause_after_message():
     input(f"\n{DIM}Press Enter to continue...{RST}")
+    _play_sfx("button_click")
+
 
 
 # ── Display Menu ─────────────────────────────────────────────────────────────
-def show_menu():
+def _draw_menu(options, selected_idx=None, selected_label=None, animate=False):
+    """Render the full menu. When selected_idx is set, box that option."""
     clear_screen(show_banner=True)
     print(f"\n{Y}{'═' * 32}{RST}")
     print(f"  {Y}{BRT}        FLAPPY  FISH{RST}")
@@ -74,6 +254,28 @@ def show_menu():
     if current_user:
         print(f"  {G}● Logged in as: {BRT}{current_user}{RST}")
         print(f"{Y}{'─' * 32}{RST}")
+
+    for i, (_, label) in enumerate(options):
+        if i == selected_idx:
+            inner  = f"  {i + 1}. {label}  "
+            border = "─" * len(inner)
+            print(f"  {Y}{BRT}┌{border}┐{RST}")
+            print(f"  {Y}{BRT}│{inner}│{RST}")
+            print(f"  {Y}{BRT}└{border}┘{RST}")
+        elif animate:
+            _typewrite_option(f"  {C}{i + 1}.{RST} ", label)
+        else:
+            print(f"  {C}{i + 1}.{RST} {label}")
+
+    print(f"  {DIM}{len(options) + 1}. Remove User (DEBUG){RST}")
+    print(f"{Y}{'═' * 32}{RST}")
+
+    if selected_label is not None:
+        print(f"  {C}›{RST} {Y}{BRT}{selected_label}{RST}")
+
+
+def show_menu():
+    if current_user:
         options = [
             ("start",       "Start Game"),
             ("leaderboard", "Leaderboard"),
@@ -88,20 +290,25 @@ def show_menu():
             ("exit",        "Exit"),
         ]
 
-    for i, (_, label) in enumerate(options, start=1):
-        print(f"  {C}{i}.{RST} {label}")
-    print(f"  {DIM}{len(options) + 1}. Remove User (DEBUG){RST}")
-    print(f"{Y}{'═' * 32}{RST}")
+    _draw_menu(options, animate=True)
+    choice = _animated_input()
 
-    choice = input(f"  {C}› {RST}").strip()
     # TESTING CODE
     if choice == str(len(options) + 2):
         return "test"
     # TESTING CODE
-    if choice.isdigit() and 1 <= int(choice) <= len(options):
-        return options[int(choice) - 1][0]
     if choice == str(len(options) + 1):
         return "remove"
+
+    if choice.isdigit() and 1 <= int(choice) <= len(options):
+        selected_idx = int(choice) - 1
+        action = options[selected_idx][0]
+
+        _play_sfx("button_click")
+        _draw_menu(options, selected_idx=selected_idx, selected_label=action)
+        time.sleep(0.25)
+        return action
+
     return "invalid"
 
 
@@ -130,10 +337,10 @@ def show_rules():
     • The pipes move faster over time.
 """)
     print(f"{C}{'═' * 42}{RST}")
-    print(f"  {C}1.{RST} Start game")
-    print(f"  {C}2.{RST} Back to main menu")
+    _typewrite_option(f"  {C}1.{RST} ", "Start game")
+    _typewrite_option(f"  {C}2.{RST} ", "Back to main menu")
     print(f"{C}{'═' * 42}{RST}")
-    choice = input(f"  {C}› {RST}").strip()
+    choice = _menu_input()
     if choice != "1":
         return False
     
@@ -158,10 +365,10 @@ def start_game(username):
         print(f"\n{R}{'═' * 32}{RST}")
         print(f"  {R}{BRT}    GAME  OVER{RST}")
         print(f"{R}{'═' * 32}{RST}")
-        print(f"  {C}1.{RST} Play again")
-        print(f"  {C}2.{RST} Back to main menu")
+        _typewrite_option(f"  {C}1.{RST} ", "Play again")
+        _typewrite_option(f"  {C}2.{RST} ", "Back to main menu")
         print(f"{R}{'═' * 32}{RST}")
-        choice = input(f"  {C}› {RST}").strip()
+        choice = _menu_input()
         if choice != "1":
             return False
         
@@ -253,6 +460,7 @@ def display_leaderboard():
         print(f"{R}Error: {result['message']}{RST}")
         print(f"{R}{'═' * 38}{RST}\n")
         input("Press Enter to return to menu...")
+        _play_sfx("button_click")
         return
 
     players = result["players"]
@@ -262,6 +470,7 @@ def display_leaderboard():
         print("  No leaderboard data available yet.")
         print(f"{Y}{'═' * 38}{RST}\n")
         input("Press Enter to return to menu...")
+        _play_sfx("button_click")
         return
 
     page = 0
@@ -285,9 +494,9 @@ def display_leaderboard():
 
         print()
         for i, (_, label) in enumerate(options, start=1):
-            print(f"  {C}{i}.{RST} {label}")
+            _typewrite_option(f"  {C}{i}.{RST} ", label)
 
-        choice = input(f"  {C}› {RST}").strip()
+        choice = _menu_input()
 
         if not choice.isdigit() or not (1 <= int(choice) <= len(options)):
             print(f"{R}Invalid choice, try again.{RST}")
@@ -309,10 +518,10 @@ def display_leaderboard():
             _search_player(players)
             while True:
                 print()
-                print(f"  {C}1.{RST} Back to leaderboard")
-                print(f"  {C}2.{RST} Search player")
-                print(f"  {C}3.{RST} Back to main menu")
-                sub = input(f"  {C}› {RST}").strip()
+                _typewrite_option(f"  {C}1.{RST} ", "Back to leaderboard")
+                _typewrite_option(f"  {C}2.{RST} ", "Search player")
+                _typewrite_option(f"  {C}3.{RST} ", "Back to main menu")
+                sub = _menu_input()
                 if sub == "1":
                     break
                 elif sub == "2":
@@ -377,6 +586,7 @@ def handle_remove_code(code, username):
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     global current_user
+    show_intro()
     try:
         while True:
             action = show_menu()
