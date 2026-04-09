@@ -1,6 +1,9 @@
 import math
+from pathlib import Path
 from gameObjects.game_object import GameObject
 from gameObjects.sprite import Sprite
+
+_ASSETS = Path(__file__).resolve().parent.parent / "assets"
 
 
 class Obstacle(GameObject):
@@ -8,12 +11,16 @@ class Obstacle(GameObject):
         self,
         x: float,
         y: float,
-        sprite_path: str,
+        sprite_path,
         amplitude: float = 0.0,
         frequency: float = 0.0,
         min_y: float = 0.0,
         max_y: float = 0.0,
     ):
+        # Accept bool (True=top, False=bottom) for backwards compatibility with tests.
+        if isinstance(sprite_path, bool):
+            name = "tentacles_top.txt" if sprite_path else "tentacles_bottom.txt"
+            sprite_path = str(_ASSETS / name)
         self._x_float: float = float(x)
         self._y_float: float = float(y)
         self._base_y: float = float(y)
