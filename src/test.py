@@ -6,6 +6,7 @@ from gameObjects.obstacle import Obstacle
 from gameObjects.player import Player
 from gameObjects.sprite import Sprite
 from display import _ASSETS, draw
+from game_logic import update_score
 
 class TestFrontend(unittest.TestCase):
 
@@ -71,6 +72,37 @@ class TestFrontend(unittest.TestCase):
             self.assertTrue(True)  # If no exceptions are raised, the test passes
         except Exception as e:
             self.fail(f"draw() raised an exception: {e}")
+
+    def test_score_increases_after_fully_passing_obstacle(self):
+        player = Player(20, 5)
+        top = Obstacle(0, -5, str(_ASSETS / "tentacles_top.txt"))
+        bottom = Obstacle(0, 10, str(_ASSETS / "tentacles_bottom.txt"))
+        passed_pairs = set()
+
+        score = update_score(player, [(top, bottom)], passed_pairs, 0)
+
+        self.assertEqual(score, 1)
+
+    def test_score_does_not_increase_before_fully_passing_obstacle(self):
+        top = Obstacle(0, -5, str(_ASSETS / "tentacles_top.txt"))
+        bottom = Obstacle(0, 10, str(_ASSETS / "tentacles_bottom.txt"))
+        player = Player(top.position[0] + top.width, 5)
+        passed_pairs = set()
+
+        score = update_score(player, [(top, bottom)], passed_pairs, 0)
+
+        self.assertEqual(score, 0)
+
+    def test_score_only_increases_once_per_obstacle(self):
+        player = Player(20, 5)
+        top = Obstacle(0, -5, str(_ASSETS / "tentacles_top.txt"))
+        bottom = Obstacle(0, 10, str(_ASSETS / "tentacles_bottom.txt"))
+        passed_pairs = set()
+
+        score = update_score(player, [(top, bottom)], passed_pairs, 0)
+        score = update_score(player, [(top, bottom)], passed_pairs, score)
+
+        self.assertEqual(score, 1)
         
 
     

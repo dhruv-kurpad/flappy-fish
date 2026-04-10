@@ -1,6 +1,7 @@
 from blessed import Terminal
 import time
 from pathlib import Path
+from auth import get_leaderboard
 from gameObjects.player import Player
 from gameObjects.obstacle_spawner import ObstacleSpawner, ObstacleTypeConfig
 from display import draw
@@ -19,8 +20,36 @@ def check_collision(player, obs):
 
     return overlap_x and overlap_y
 
+def update_score(player, obstacle_pairs, passed_pairs, score):
+    active_pairs = set()
+    player_left_edge = player.position[0]
+
+    for top, bot in obstacle_pairs:
+        pair_id = id(top)
+        active_pairs.add(pair_id)
+        pair_right_edge = top.position[0] + top.width
+
+        if pair_right_edge < player_left_edge and pair_id not in passed_pairs:
+            score += 1
+            passed_pairs.add(pair_id)
+
+    passed_pairs.intersection_update(active_pairs)
+    return score
+
+def get_high_score(username):
+    result = get_leaderboard()
+    if not result.get("success"):
+        return 0
+
+    for player in result.get("players", []):
+        if player.get("name") == username:
+            return player.get("highScore", 0)
+
+    return 0
+
 def start_game_logic(username):
     term = Terminal()
+    saved_high_score = get_high_score(username)
 
     # --- Create Game Objects ---
     player = Player(term.width // 2 - 7, term.height // 2)
@@ -73,7 +102,7 @@ def start_game_logic(username):
         print(term.clear + term.hide_cursor, end="", flush=True)
 
         # --- PREGAME OVERLAY ---
-        draw(player, spawner.obstacles, score=0, high_score=0, term=term, disp_bubbles=False)
+        draw(player, spawner.obstacles, score=0, high_score=saved_high_score, term=term, disp_bubbles=False)
         popup = " PRESS SPACE BAR TO BEGIN "
         x_pos = term.width // 2 - len(popup) // 2
         y_pos = term.height // 2
@@ -87,7 +116,7 @@ def start_game_logic(username):
                 last_flap_time = time.time()
                 waiting = False
             elif key.code == term.KEY_ESCAPE or key == 'q':
-                return
+                return 0
         # --- END PREGAME OVERLAY ---
 
         score = 0
@@ -137,17 +166,7 @@ def start_game_logic(username):
             if current_time - last_space_press > bubble_display_time:
                 display_bubbles = False
             # 7. UPDATE SCORE
-            active_pairs = set()
-            for top, bot in spawner._pairs:
-                pair_id = id(top)
-                active_pairs.add(pair_id)
-                pair_right_edge = top.position[0] + top.width
-
-                if pair_right_edge < player.position[0] + player.width and pair_id not in passed_pairs:
-                    score += 1
-                    passed_pairs.add(pair_id)
-
-            passed_pairs.intersection_update(active_pairs)
+            score = update_score(player, spawner._pairs, passed_pairs, score)
             # 8. Check for difficulty increase
             if score % 10 == 0 and score > 0 and not just_increased_difficulty:
                 new_speed = spawner._speed + 0.2
@@ -164,7 +183,8 @@ def start_game_logic(username):
             elif score % 10 != 0:
                 just_increased_difficulty = False
             # 8. RENDER
-            draw(player, spawner.obstacles, score=score, high_score=0, term=term, disp_bubbles=display_bubbles)
+            current_high_score = max(saved_high_score, score)
+            draw(player, spawner.obstacles, score=score, high_score=current_high_score, term=term, disp_bubbles=display_bubbles)
 
             time.sleep(0.01)
 
@@ -174,3 +194,4 @@ def start_game_logic(username):
         time.sleep(2)
 
     print(term.clear + term.hide_cursor, end="", flush=True)
+    return score
