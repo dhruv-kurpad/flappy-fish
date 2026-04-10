@@ -193,5 +193,5 @@ def start_game_logic(username):
         print(term.move_xy(term.width // 2 - len(game_over_text) // 2, term.height // 2) + term.red_on_black(game_over_text), end="", flush=True)
         time.sleep(2)
 
-    print(term.clear + term.hide_cursor, end="", flush=True)
+    print(term.clear + term.show_cursor, end="", flush=True)
     return score

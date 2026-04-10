@@ -65,7 +65,7 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
             else:
                 line += " "
         output += line + "\n"
-    print(output, end="", flush=True)
+    print(output + term.hide_cursor, end="", flush=True)
 
 # Example use case for testing the draw function
 if __name__ == "__main__":
