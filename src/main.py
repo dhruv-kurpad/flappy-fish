@@ -522,8 +522,9 @@ def _print_leaderboard_page(players, page, highlight_username=None):
 
 
 def _search_player(players):
-    """Ask for username and display result inline (no screen clear). Returns True if found."""
+    """Ask for username, clear screen, then display result. Returns True if found."""
     username = _input_with_sfx(f"  {C}Enter username to search: {RST}").strip()
+    clear_screen()
     if not username:
         _typewriter("  No username entered.", color=R)
         return False
@@ -623,10 +624,8 @@ def display_leaderboard():
                 page = int(target) - 1
             # invalid input falls through; loop clears and redraws leaderboard
         elif action == "search":
-            # Keep leaderboard visible; search input appears below it
             _search_player(players)
             while True:
-                # Show sub-menu options below whatever is currently on screen
                 print()
                 _typewrite_option(f"  {C}1.{RST} ", "Back to leaderboard")
                 _typewrite_option(f"  {C}2.{RST} ", "Search player")
@@ -635,10 +634,6 @@ def display_leaderboard():
                 if sub == "1":
                     break
                 elif sub == "2":
-                    # Re-draw leaderboard fresh, then search below it
-                    clear_screen()
-                    _print_leaderboard_page(players, page)
-                    print()
                     _search_player(players)
                 elif sub == "3":
                     return
@@ -741,9 +736,8 @@ def main():
 
             elif action == "exit":
                 _bgm.stop()
-                clear_screen()
                 _typewriter("Goodbye! See you next time ~", delay=0.04, color=Y)
-                time.sleep(1.5)
+                clear_screen()
                 sys.exit()
 
             elif action == "remove":
