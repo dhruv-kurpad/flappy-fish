@@ -13,7 +13,11 @@ _ASSETS = Path(__file__).resolve().parent / "assets"
 # - score: Current score of the player
 # - high_score: Highest score achieved by the player
 # - term: Terminal object from the blessed library for controlling terminal output
-def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int, term: Terminal, disp_bubbles: bool):
+def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int, term: Terminal,
+         bubbles: list = None, ambient_bubbles: list = None,
+         crabs: list = None, crab_frames: list = None, crab_y: int = 0,
+         jellyfishes: list = None, jf_sprites: list = None,
+         jf_bubbles: list = None):
     output = term.home
     output += "\n"
 
@@ -27,41 +31,89 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
     WIDTH = term.width
     HEIGHT = term.height - len(header.split('\n')) - 1
     #Temporary code for now!
-    
-    # Draw the game area with player and obstacles
+
+    # Fish trail/flap bubbles: O(1) set lookup, all render as 'o'
+    bubble_set = {(round(b[0]), round(b[1])) for b in bubbles} if bubbles else set()
+
+    # Decorative crabs: build (x, y) -> char from the current animation frame.
+    # Spaces in the sprite are transparent (not added to the map).
+    crab_map: dict = {}
+    if crabs and crab_frames:
+        for c in crabs:
+            cx    = round(c[0])
+            frame = crab_frames[c[1]]
+            for row_i, row in enumerate(frame):
+                ry = crab_y + row_i
+                for col_i, ch in enumerate(row):
+                    if ch != ' ':
+                        crab_map[(cx + col_i, ry)] = ch
+
+    # Jellyfish: build (x, y) -> char from the active sprite frame.
+    # Spaces are transparent. Uses dim magenta (\033[2;35m) for a dark-purple look.
+    jf_map: dict = {}
+    if jellyfishes and jf_sprites:
+        for jf in jellyfishes:
+            cx, cy = round(jf[0]), round(jf[1])
+            sprite  = jf_sprites[jf[2]]
+            for row_i, row in enumerate(sprite):
+                for col_i, ch in enumerate(row):
+                    if ch != ' ':
+                        jf_map[(cx + col_i, cy + row_i)] = ch
+
+    # Jellyfish thrust bubbles: [x, y, vx, vy, char] — use char for size variation.
+    # Later entries overwrite earlier ones if they round to the same cell (fine for decoration).
+    jf_bubble_map: dict = {}
+    if jf_bubbles:
+        for b in jf_bubbles:
+            jf_bubble_map[(round(b[0]), round(b[1]))] = b[4]
+
+    # Ambient decorative bubbles: dict (x, y) -> char so each size renders correctly.
+    ambient_map: dict = {}
+    if ambient_bubbles:
+        for b in ambient_bubbles:
+            ambient_map[(round(b[0]), round(b[1]))] = b[3]
+
+    # Dim-magenta ANSI sequence for jellyfish (dark purple).
+    DIM_MAGENTA = "\033[2;35m"
+    RESET       = "\033[m"
+
+    # Draw the game area — render priority (top = highest):
+    #   Player > Crabs > Obstacles > Fish bubbles >
+    #   Jellyfish > Jellyfish bubbles > Ambient bubbles
     for y in range(HEIGHT):
         line = ""
         for x in range(WIDTH):
-            if x >= round(player.position[0]) and x < round(player.position[0]) + player.width and y >= round(player.position[1]) and y < round(player.position[1]) + player.height:
-                line += f"{term.yellow}{player.sprite.display[y - round(player.position[1])][x - round(player.position[0])]}{term.normal}"
-            elif any(x >= round(obs.position[0]) and x < round(obs.position[0]) + obs.width and y >= round(obs.position[1]) and y < round(obs.position[1]) + obs.height for obs in obstacles):
-                obs = next(obs for obs in obstacles if x >= round(obs.position[0]) and x < round(obs.position[0]) + obs.width and y >= round(obs.position[1]) and y < round(obs.position[1]) + obs.height)
-                line += f"{term.green}{obs.sprite.display[y - round(obs.position[1])][x - round(obs.position[0])]}{term.normal}"
-            # Draw Bubbles
-            elif x == round(player.position[0]) + player.width + 2 and y == round(player.position[1]) + round(player.height/2) and disp_bubbles:
-                line += "o"
-            elif x == round(player.position[0]) + player.width + 4 and y == round(player.position[1]) + round(player.height/2) - 2 and disp_bubbles:
-                line += "o"
-            elif x == round(player.position[0]) + player.width + 5 and y == round(player.position[1]) + round(player.height/2) - 6 and disp_bubbles:
-                line += "o"
-            elif x == round(player.position[0]) and y == round(player.position[1]) + player.height + 2 and disp_bubbles:
-                line += "o"
-            elif x == round(player.position[0]) - 1 and y == round(player.position[1]) + player.height + 4 and disp_bubbles:
-                line += "o"
-            elif x == round(player.position[0]) - 2 and y == round(player.position[1]) + player.height + 6 and disp_bubbles:
-                line += "o"
-            elif x == round(player.position[0]) + round(player.width/2) and y == round(player.position[1]) + player.height + 2 and disp_bubbles:
-                line += "o"
-            elif x == round(player.position[0]) + round(player.width/2) and y == round(player.position[1]) + player.height + 4 and disp_bubbles:
-                line += "o"
-            elif x == round(player.position[0]) + round(player.width/2) and y == round(player.position[1]) + player.height + 6 and disp_bubbles:
-                line += "o"
-            elif x == round(player.position[0]) + player.width and y == round(player.position[1]) + round(player.height) + 2 and disp_bubbles:
-                line += "o"
-            elif x == round(player.position[0]) + player.width + 1 and y == round(player.position[1]) + round(player.height) + 4 and disp_bubbles:
-                line += "o"
-            elif x == round(player.position[0]) + player.width + 2 and y == round(player.position[1]) + round(player.height) + 6 and disp_bubbles:
-                line += "o"
+            if (x >= round(player.position[0]) and x < round(player.position[0]) + player.width
+                    and y >= round(player.position[1]) and y < round(player.position[1]) + player.height):
+                # Player sprite — highest priority
+                line += (f"{term.yellow}"
+                         f"{player.sprite.display[y - round(player.position[1])][x - round(player.position[0])]}"
+                         f"{term.normal}")
+            elif (x, y) in crab_map:
+                # Crab — in front of obstacles so it appears at the foreground bottom
+                line += f"{term.red}{crab_map[(x, y)]}{term.normal}"
+            elif any(x >= round(obs.position[0]) and x < round(obs.position[0]) + obs.width
+                     and y >= round(obs.position[1]) and y < round(obs.position[1]) + obs.height
+                     for obs in obstacles):
+                # Obstacle sprite
+                obs = next(obs for obs in obstacles
+                           if x >= round(obs.position[0]) and x < round(obs.position[0]) + obs.width
+                           and y >= round(obs.position[1]) and y < round(obs.position[1]) + obs.height)
+                line += (f"{term.green}"
+                         f"{obs.sprite.display[y - round(obs.position[1])][x - round(obs.position[0])]}"
+                         f"{term.normal}")
+            elif (x, y) in bubble_set:
+                # Fish trail / flap bubbles
+                line += f"{term.cyan}o{term.normal}"
+            elif (x, y) in jf_map:
+                # Jellyfish — dim magenta (distant/dark purple)
+                line += f"{DIM_MAGENTA}{jf_map[(x, y)]}{RESET}"
+            elif (x, y) in jf_bubble_map:
+                # Jellyfish thrust bubbles — dim cyan (same darkness as jellyfish, blue colour)
+                line += f"\033[2;36m{jf_bubble_map[(x, y)]}{RESET}"
+            elif (x, y) in ambient_map:
+                # Ambient decorative bubbles — background layer, lowest priority
+                line += f"{term.cyan}{ambient_map[(x, y)]}{term.normal}"
             else:
                 line += " "
         output += line + "\n"
@@ -77,4 +129,4 @@ if __name__ == "__main__":
         Obstacle(70, 19, str(_ASSETS / "tentacles_bottom.txt")),
         Obstacle(70, -5, str(_ASSETS / "tentacles_top.txt")),
     ]
-    draw(player, obstacles, score, high_score, term, disp_bubbles=False)
+    draw(player, obstacles, score, high_score, term, bubbles=[], ambient_bubbles=[])
