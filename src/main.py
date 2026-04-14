@@ -456,10 +456,13 @@ def show_rules():
 def start_game(username):
     _typewriter(f"Welcome, {username}! Get ready...", delay=0.04, color=G)
     pause_after_message()
+    first_run = True
     while True:
-        if not show_rules():
-            _bgm.switch("menu_bgm")
-            return
+        if first_run:
+            if not show_rules():
+                _bgm.switch("menu_bgm")
+                return
+            first_run = False
         clear_screen()
         print(f"{Y}--- GAME STARTING ---{RST}")
         print(" (control options) ")
@@ -477,8 +480,8 @@ def start_game(username):
         choice = _menu_input()
         if choice != "1":
             return False
-
-        return True
+        # Restart should begin a fresh run instead of returning to main().
+        continue
 
 
 # ── Leaderboard helpers ──────────────────────────────────────────────────────
