@@ -48,7 +48,7 @@ unit_test_frontend:
     expire_in: 30 days
     paths:
       - results.log
-      - build/reports/coverage.xml
+      - coverage.xml
 
 unit_test_backend:
   stage: unit_test
