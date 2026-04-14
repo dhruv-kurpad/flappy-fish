@@ -33,7 +33,8 @@ unit_test_frontend:
   image: python
   script:
     - pip install -r src/requirements.txt
-    - pytest --cov=src/test.py --cov-report=xml:coverage.xml
+    - python -m coverage run -m unittest discover -s src
+    - coverage xml
   coverage: '/COVERAGE: ([0-9]{1,3}%)/'
   rules:
     - changes:

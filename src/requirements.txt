@@ -4,6 +4,4 @@ certifi>=2024.2.25
 charset-normalizer>=3.0.0
 blessed>=0.6.0
 colorama>=0.4.6
-pytest
-pytest-cov
 coverage
