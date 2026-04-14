@@ -8,5 +8,9 @@ class Sprite:
 
     def _generate_display(self, file_path: str) -> List[List[str]]:
         with open(file_path, 'r') as file:
-            display = [list(line[:-1] if line.endswith('\n') else line) for line in file]
-        return display
+            rows = [list(line[:-1] if line.endswith('\n') else line) for line in file]
+        # Pad all rows to the same width so display[row][col] never goes out of range.
+        max_width = max((len(row) for row in rows), default=0)
+        for row in rows:
+            row += [' '] * (max_width - len(row))
+        return rows

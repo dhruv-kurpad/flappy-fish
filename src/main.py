@@ -1,3 +1,4 @@
+import os
 import sys
 import time
 import random
@@ -8,7 +9,69 @@ from auth import login_user, register_user, remove_user, get_leaderboard
 from game_logic import start_game_logic
 from colorama import init, Fore, Style
 
-init(autoreset=True)
+init(autoreset=False)
+
+# ── BGM player ────────────────────────────────────────────────────────────────
+class _BGMPlayer:
+    """Loops a WAV file in a background thread. Call switch() to cross-fade tracks."""
+
+    def __init__(self):
+        self._stop_event = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._current: str | None = None
+
+    def _loop(self, path: str, stop: threading.Event):
+        while not stop.is_set():
+            if sys.platform == "darwin":
+                proc = subprocess.Popen(["afplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            elif sys.platform == "win32":
+                # winsound.PlaySound blocks; use a subprocess for looping on Windows
+                proc = subprocess.Popen(
+                    ["powershell", "-c", f"(New-Object Media.SoundPlayer '{path}').PlayLooping(); Start-Sleep 9999"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                )
+                stop.wait()
+                proc.terminate()
+                return
+            else:
+                proc = subprocess.Popen(["aplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+            # Wait for afplay/aplay to finish OR for stop signal
+            while proc.poll() is None:
+                if stop.is_set():
+                    proc.terminate()
+                    return
+                time.sleep(0.05)
+
+    def play(self, name: str):
+        """Start playing a BGM track by name (no extension). No-op if already playing."""
+        path = str(_SOUNDS / f"{name}.wav")
+        if not Path(path).exists():
+            return
+        if self._current == name and self._thread and self._thread.is_alive():
+            return
+        self.stop()
+        self._current = name
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(
+            target=self._loop, args=(path, self._stop_event), daemon=True
+        )
+        self._thread.start()
+
+    def stop(self):
+        if self._thread and self._thread.is_alive():
+            self._stop_event.set()
+            self._thread.join(timeout=1.0)
+        self._current = None
+
+    def switch(self, name: str):
+        """Stop current BGM and start a new one."""
+        if self._current != name:
+            self.stop()
+            self.play(name)
+
+
+_bgm = _BGMPlayer()
 
 # ── Color shortcuts ──────────────────────────────────────────────────────────
 Y   = Fore.YELLOW
@@ -70,6 +133,21 @@ def _play_sfx(name: str):
         ).start()
 
 
+def _flush_stdin():
+    """Discard any keystrokes buffered during animations so they don't skip the next prompt."""
+    try:
+        import termios
+        termios.tcflush(sys.stdin, termios.TCIFLUSH)
+    except Exception:
+        # Windows fallback
+        try:
+            import msvcrt
+            while msvcrt.kbhit():
+                msvcrt.getwch()
+        except Exception:
+            pass
+
+
 def _animated_input() -> str:
     """Blinking ><> fish as the prompt cursor: yellow → blank → cyan → blank → …"""
     stop = threading.Event()
@@ -99,7 +177,10 @@ def _animated_input() -> str:
     t = threading.Thread(target=_animate, daemon=True)
     t.start()
 
-    val = input("").strip()   # prompt already printed above
+    # Flush any keystrokes typed during the preceding animation so they
+    # don't immediately skip this prompt before the user sees the screen.
+    _flush_stdin()
+    val = input("").strip()
 
     stop.set()
     t.join(timeout=0.4)
@@ -219,11 +300,30 @@ def clear_screen(show_banner=False):
         print(BANNER)
 
 
-def _typewriter(text, delay=0.03):
+def _vcenter_pad(content_lines: int = 1):
+    """Print blank lines so that `content_lines` rows appear vertically centered."""
+    try:
+        term_h = os.get_terminal_size().lines
+    except OSError:
+        term_h = 24
+    pad = max(0, (term_h - content_lines) // 2)
+    print("\n" * pad, end="")
+
+
+def _typewriter(text, delay=0.03, color=""):
+    """Print text character by character. Pass a full ANSI color code via color=;
+    it is written atomically before the loop so the terminal never sees a partial escape sequence."""
+    if color:
+        sys.stdout.write(color)
+        sys.stdout.flush()
     for ch in text:
-        print(ch, end="", flush=True)
+        sys.stdout.write(ch)
+        sys.stdout.flush()
         time.sleep(delay)
-    print()
+    if color:
+        sys.stdout.write(RST)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
 
 
 def _typewrite_option(prefix: str, label: str, delay: float = 0.018):
@@ -354,15 +454,18 @@ def show_rules():
 
 # ── Core game logic function ─────────────────────────────────────────────────
 def start_game(username):
-    clear_screen()
-    _typewriter(f"{G}Welcome, {username}! Get ready...{RST}", delay=0.04)
+    _typewriter(f"Welcome, {username}! Get ready...", delay=0.04, color=G)
+    pause_after_message()
     while True:
         if not show_rules():
+            _bgm.switch("menu_bgm")
             return
         clear_screen()
         print(f"{Y}--- GAME STARTING ---{RST}")
         print(" (control options) ")
+        _bgm.switch("game_bgm")
         start_game_logic(username)
+        _bgm.switch("menu_bgm")
 
         clear_screen()
         print(f"\n{R}{'═' * 32}{RST}")
@@ -374,7 +477,7 @@ def start_game(username):
         choice = _menu_input()
         if choice != "1":
             return False
-        
+
         return True
 
 
@@ -416,18 +519,19 @@ def _print_leaderboard_page(players, page, highlight_username=None):
 
 
 def _search_player(players):
+    """Ask for username and display result inline (no screen clear). Returns True if found."""
     username = _input_with_sfx(f"  {C}Enter username to search: {RST}").strip()
     if not username:
-        print(f"{R}No username entered.{RST}")
-        return
+        _typewriter("  No username entered.", color=R)
+        return False
 
     idx = next(
         (i for i, p in enumerate(players) if p.get("username") == username), None
     )
 
     if idx is None:
-        print(f"{R}Player '{username}' not found in leaderboard.{RST}")
-        return
+        _typewriter(f"  Player '{username}' not found in leaderboard.", color=R)
+        return False
 
     context_start = max(0, idx - 2)
     context_end = min(len(players), idx + 3)
@@ -452,6 +556,7 @@ def _search_player(players):
             print(f"    {row}")
 
     print(f"{C}{'═' * 38}{RST}")
+    return True
 
 
 def display_leaderboard():
@@ -459,19 +564,19 @@ def display_leaderboard():
     result = get_leaderboard()
 
     if not result["success"]:
-        print(f"\n{R}{'═' * 38}{RST}")
-        print(f"{R}Error: {result['message']}{RST}")
-        print(f"{R}{'═' * 38}{RST}\n")
-        _input_with_sfx("Press Enter to return to menu...")
+        _typewriter(f"\n{'═' * 38}", color=R)
+        _typewriter(f"Error: {result['message']}", color=R)
+        _typewriter(f"{'═' * 38}\n", color=R)
+        pause_after_message()
         return
 
     players = result["players"]
 
     if not players:
-        print(f"\n{Y}{'═' * 38}{RST}")
-        print("  No leaderboard data available yet.")
-        print(f"{Y}{'═' * 38}{RST}\n")
-        _input_with_sfx("Press Enter to return to menu...")
+        _typewriter(f"\n{'═' * 38}", color=Y)
+        _typewriter("  No leaderboard data available yet.")
+        _typewriter(f"{'═' * 38}\n", color=Y)
+        pause_after_message()
         return
 
     page = 0
@@ -500,7 +605,6 @@ def display_leaderboard():
         choice = _menu_input()
 
         if not choice.isdigit() or not (1 <= int(choice) <= len(options)):
-            print(f"{R}Invalid choice, try again.{RST}")
             continue
 
         action = options[int(choice) - 1][0]
@@ -510,14 +614,16 @@ def display_leaderboard():
         elif action == "next":
             page += 1
         elif action == "goto":
+            # Keep leaderboard visible; ask for page number inline below it
             target = _input_with_sfx(f"  Enter page number (1-{total_pages}): ").strip()
             if target.isdigit() and 1 <= int(target) <= total_pages:
                 page = int(target) - 1
-            else:
-                print(f"{R}Invalid page number, must be between 1 and {total_pages}.{RST}")
+            # invalid input falls through; loop clears and redraws leaderboard
         elif action == "search":
+            # Keep leaderboard visible; search input appears below it
             _search_player(players)
             while True:
+                # Show sub-menu options below whatever is currently on screen
                 print()
                 _typewrite_option(f"  {C}1.{RST} ", "Back to leaderboard")
                 _typewrite_option(f"  {C}2.{RST} ", "Search player")
@@ -526,12 +632,14 @@ def display_leaderboard():
                 if sub == "1":
                     break
                 elif sub == "2":
+                    # Re-draw leaderboard fresh, then search below it
                     clear_screen()
+                    _print_leaderboard_page(players, page)
+                    print()
                     _search_player(players)
                 elif sub == "3":
                     return
-                else:
-                    print(f"{R}Invalid choice, try again.{RST}")
+                # invalid input: sub-menu re-prints below on next iteration
         elif action == "back":
             return
 
@@ -539,13 +647,13 @@ def display_leaderboard():
 # ── Input validation ─────────────────────────────────────────────────────────
 def validate_credentials(username, password):
     if not username.strip():
-        print(f"{R}Error: Username cannot be empty.{RST}")
+        _typewriter("Error: Username cannot be empty.", color=R)
         return False
     if " " in username:
-        print(f"{R}Error: Username cannot contain spaces.{RST}")
+        _typewriter("Error: Username cannot contain spaces.", color=R)
         return False
     if not password.strip():
-        print(f"{R}Error: Password cannot be empty.{RST}")
+        _typewriter("Error: Password cannot be empty.", color=R)
         return False
     return True
 
@@ -553,41 +661,42 @@ def validate_credentials(username, password):
 # ── Code handlers ─────────────────────────────────────────────────────────────
 def handle_register_code(code, username):
     if code == 0:
-        print(f"{G}Registration Successful!{RST}")
+        _typewriter("Registration Successful!", color=G)
     elif code == -1:
-        print(f"{R}Error: Username '{username}' is already taken.{RST}")
+        _typewriter(f"Error: Username '{username}' is already taken.", color=R)
     elif code == -2:
-        print(f"{R}Error: Username cannot be empty.{RST}")
+        _typewriter("Error: Username cannot be empty.", color=R)
     elif code == -3:
-        print(f"{R}Error: Password cannot be empty.{RST}")
+        _typewriter("Error: Password cannot be empty.", color=R)
     else:
-        print(f"{R}Error: Cannot connect to backend.{RST}")
+        _typewriter("Error: Cannot connect to backend.", color=R)
 
 
 def handle_login_code(code):
     if code == 0:
-        print(f"{G}Login successful!{RST}")
+        _typewriter("Login successful!", color=G)
     elif code == -1:
-        print(f"{R}Error: Username not found.{RST}")
+        _typewriter("Error: Username not found.", color=R)
     elif code == -2:
-        print(f"{R}Error: Incorrect password.{RST}")
+        _typewriter("Error: Incorrect password.", color=R)
     else:
-        print(f"{R}Error: Cannot connect to backend.{RST}")
+        _typewriter("Error: Cannot connect to backend.", color=R)
 
 
 def handle_remove_code(code, username):
     if code == 0:
-        print(f"{G}User '{username}' removed successfully.{RST}")
+        _typewriter(f"User '{username}' removed successfully.", color=G)
     elif code == -1:
-        print(f"{R}Error: No user with username '{username}' found.{RST}")
+        _typewriter(f"Error: No user with username '{username}' found.", color=R)
     else:
-        print(f"{R}Error: Cannot connect to backend.{RST}")
+        _typewriter("Error: Cannot connect to backend.", color=R)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     global current_user
     show_intro()
+    _bgm.play("menu_bgm")
     try:
         while True:
             action = show_menu()
@@ -623,16 +732,18 @@ def main():
                 display_leaderboard()
 
             elif action == "logout":
-                print(f"{G}Logged out. See you, {current_user}!{RST}")
+                _typewriter(f"Logged out. See you, {current_user}!", color=G)
                 current_user = None
                 pause_after_message()
 
             elif action == "exit":
-                _typewriter(f"{Y}Goodbye! See you next time ~{RST}", delay=0.04)
+                _bgm.stop()
+                clear_screen()
+                _typewriter("Goodbye! See you next time ~", delay=0.04, color=Y)
+                time.sleep(1.5)
                 sys.exit()
 
             elif action == "remove":
-                print(f"{DIM}Removing user...{RST}")
                 username = _input_with_sfx(f"  {C}Username to remove: {RST}")
                 result = remove_user(username)
                 code = result["code"]
@@ -642,12 +753,15 @@ def main():
             # TESTING CODE
             elif action == "test":
                 start_game("TEST USER")
+                _bgm.switch("menu_bgm")
             # TESTING CODE
 
             else:
-                print(f"{R}Invalid choice, try again.{RST}")
+                clear_screen()
+                _typewriter("Invalid choice, try again.", color=R)
                 pause_after_message()
     except (KeyboardInterrupt, EOFError):
+        _bgm.stop()
         print(f"\n{Y}Exiting...{RST}")
         sys.exit(0)
 

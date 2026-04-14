@@ -68,7 +68,7 @@ class TestFrontend(unittest.TestCase):
         high_score = 8
         obstacles = [Obstacle(70, 19, str(_ASSETS / "tentacles_bottom.txt")), Obstacle(70, -5, str(_ASSETS / "tentacles_top.txt"))]
         try:
-            draw(player, obstacles, score, high_score, term, disp_bubbles=False)
+            draw(player, obstacles, score, high_score, term, bubbles=[], ambient_bubbles=[])
             self.assertTrue(True)  # If no exceptions are raised, the test passes
         except Exception as e:
             self.fail(f"draw() raised an exception: {e}")
