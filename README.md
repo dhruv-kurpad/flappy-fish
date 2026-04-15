@@ -6,7 +6,7 @@ Also, be sure to check out the Wiki for information on how to maintain your team
 
 ## Team 3A
 
-<!--The name of your team.-->
+T_3A
 
 ### Project Abstract
 
