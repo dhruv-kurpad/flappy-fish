@@ -348,7 +348,6 @@ def pause_after_message():
     _input_with_sfx(f"\n{DIM}Press Enter to continue...{RST}")
 
 
-
 # ── Display Menu ─────────────────────────────────────────────────────────────
 def _draw_menu(options, selected_idx=None, animate=False):
     """Render the full menu. When selected_idx is set, box that option."""
@@ -609,6 +608,8 @@ def display_leaderboard():
         choice = _menu_input()
 
         if not choice.isdigit() or not (1 <= int(choice) <= len(options)):
+            _typewriter("Invalid choice, try again.", color=R)
+            pause_after_message()
             continue
 
         action = options[int(choice) - 1][0]
@@ -622,7 +623,12 @@ def display_leaderboard():
             target = _input_with_sfx(f"  Enter page number (1-{total_pages}): ").strip()
             if target.isdigit() and 1 <= int(target) <= total_pages:
                 page = int(target) - 1
-            # invalid input falls through; loop clears and redraws leaderboard
+            else:
+                _typewriter(
+                    f"Invalid page number, must be between 1 and {total_pages}.",
+                    color=R,
+                )
+                pause_after_message()
         elif action == "search":
             _search_player(players)
             while True:
@@ -637,7 +643,9 @@ def display_leaderboard():
                     _search_player(players)
                 elif sub == "3":
                     return
-                # invalid input: sub-menu re-prints below on next iteration
+                else:
+                    _typewriter("Invalid choice, try again.", color=R)
+                    pause_after_message()
         elif action == "back":
             return
 
@@ -646,12 +654,15 @@ def display_leaderboard():
 def validate_credentials(username, password):
     if not username.strip():
         _typewriter("Error: Username cannot be empty.", color=R)
+        pause_after_message()
         return False
     if " " in username:
         _typewriter("Error: Username cannot contain spaces.", color=R)
+        pause_after_message()
         return False
     if not password.strip():
         _typewriter("Error: Password cannot be empty.", color=R)
+        pause_after_message()
         return False
     return True
 
