@@ -112,8 +112,13 @@ def start_game_logic(username):
 
     # Game State
     bird_y_float = float(player.position[1])
-    gravity = 0.5
+    FRAME_SCALE = 60.0
+    TARGET_FRAME_SECONDS = 1.0 / FRAME_SCALE
+    gravity = 0.75 * FRAME_SCALE  # Convert to per-second (scaled for ~60fps baseline)
     velocity = 0.0
+
+    # --- Delta Time for frame-rate independence ---
+    last_frame_time = time.perf_counter()
 
     # --- Flap Cooldown State ---
     last_flap_time = 0.0
@@ -121,7 +126,7 @@ def start_game_logic(username):
 
     # --- Jump sprite timer ---
     # Counts down from JUMP_SPRITE_FRAMES to 0; while > 0 the jump sprite is shown.
-    JUMP_SPRITE_FRAMES = 3
+    JUMP_SPRITE_FRAMES = 0.5
     _jump_sprite_timer = 0
 
     # --- Fish bubble particle system ---
@@ -154,7 +159,7 @@ def start_game_logic(username):
     jellyfishes: list = []
     jf_bubbles:  list = []   # [x, y, vy, lifetime]  vy starts downward then reverses
     _jf_spawn_timer = 0
-    _next_jf_spawn  = random.randint(80, 160)
+    _next_jf_spawn  = random.randint(8, 10) * FRAME_SCALE
 
     # --- Decorative crab system ---
     # Two sprite frames alternate every 3 ticks; crabs scroll left slightly
@@ -169,7 +174,7 @@ def start_game_logic(username):
     crab_y      = game_height - crab_height   # pinned to the bottom row
     crabs: list = []
     _crab_spawn_timer  = 0
-    _next_crab_spawn   = random.randint(120, 200)
+    _next_crab_spawn   = random.randint(10, 12) * FRAME_SCALE
 
     is_running = True
 
@@ -201,11 +206,17 @@ def start_game_logic(username):
         passed_pairs = set()
         just_increased_difficulty = False
         while is_running:
+            # Calculate delta time
+            current_frame_time = time.perf_counter()
+            dt = current_frame_time - last_frame_time
+            last_frame_time = current_frame_time
+            dt = min(dt, 0.05)  # Cap at 50ms to prevent huge jumps
+
             prev_y = player.position[1]
 
             # 1. PHYSICS UPDATE (Player)
-            velocity += gravity
-            bird_y_float += velocity
+            velocity += gravity * dt
+            bird_y_float += velocity * dt
 
             # 2. INPUT
             key = term.inkey(timeout=0.03)
@@ -214,17 +225,17 @@ def start_game_logic(username):
             if key == ' ':
                 _play_sfx("bubble")
                 if current_time - last_flap_time > flap_cooldown:
-                    velocity = -2.5
+                    velocity = -10 * FRAME_SCALE * dt  # Convert to per-second units
                     last_flap_time = current_time
                 # Switch to jump sprite and reset the display timer
                 player.set_jumping(True)
-                _jump_sprite_timer = JUMP_SPRITE_FRAMES
+                _jump_sprite_timer = JUMP_SPRITE_FRAMES * FRAME_SCALE
                 # Flap burst: 5 bubbles scatter from around the fish body
                 for _ in range(5):
                     bx = float(player.position[0]) + random.randint(-1, player.width // 2)
                     by = float(player.position[1]) + random.randint(0, player.height - 1)
                     vy = random.uniform(0.5, 0.9)
-                    bubbles.append([bx, by, vy, 22])
+                    bubbles.append([bx, by, vy, 80])
             elif key.code == term.KEY_ESCAPE or key == 'q':
                 is_running = False
 
@@ -252,49 +263,50 @@ def start_game_logic(username):
             score = update_score(player, spawner._pairs, passed_pairs, score)
 
             # 7. CHECK DIFFICULTY INCREASE
-            if score % 10 == 0 and score > 0 and not just_increased_difficulty:
+            if score % 5 == 0 and score > 0 and not just_increased_difficulty:
                 new_speed = spawner._speed + 0.2
-                new_interval = max(30, spawner._spawn_interval - 4)
+                new_interval = max(0, spawner._spawn_interval - 10)
                 spawner.update_obstacle_speed(new_speed)
                 spawner.update_spawn_interval(new_interval)
                 just_increased_difficulty = True
 
-                if score % 20 == 0:
+                if score % 10 == 0:
                     for obs_type in spawner._types:
                         if obs_type.name == "moving":
-                            new_weight = min(obs_type.weight + 0.1, 0.4)
+                            new_weight = min(obs_type.weight + 0.2, 0.4)
                             obs_type.update_weight(new_weight)
-            elif score % 10 != 0:
+            elif score % 5 != 0:
                 just_increased_difficulty = False
 
             # 8. UPDATE JUMP SPRITE TIMER
             if _jump_sprite_timer > 0:
-                _jump_sprite_timer -= 1
-                if _jump_sprite_timer == 0:
+                _jump_sprite_timer -= dt * FRAME_SCALE
+                if _jump_sprite_timer <= 0:
                     player.set_jumping(False)
 
             # 9. UPDATE FISH BUBBLE PARTICLES
             # Trail: one bubble every 3 frames from the fish's left edge (wake side)
-            _bubble_frame += 1
-            if _bubble_frame % 3 == 0:
+            _bubble_frame += dt * FRAME_SCALE
+            while _bubble_frame >= FRAME_SCALE:
+                _bubble_frame -= FRAME_SCALE
                 bx = float(player.position[0]) + random.randint(-1, 0)
                 by = float(player.position[1]) + random.randint(0, player.height - 1)
-                bubbles.append([bx, by, 0.3, 28])
+                bubbles.append([bx, by, 0.3, 100])
 
             speed = spawner._speed
 
             # Advance fish bubbles: scroll left + drift upward + age
             live = []
             for b in bubbles:
-                b[0] -= speed
-                b[1] -= b[2]
-                b[3] -= 1
+                b[0] -= speed * dt * FRAME_SCALE * 0.25
+                b[1] -= b[2] * dt * FRAME_SCALE * 0.25
+                b[3] -= dt * FRAME_SCALE  # Convert to time-based (60fps reference)
                 if b[3] > 0 and b[1] > 0:
                     live.append(b)
             bubbles = live
 
             # 10. UPDATE AMBIENT DECORATIVE BUBBLES
-            _ambient_frame += 1
+            _ambient_frame += dt * FRAME_SCALE
             if _ambient_frame >= _next_ambient_spawn:
                 _ambient_frame = 0
                 _next_ambient_spawn = random.randint(40, 80)
@@ -333,17 +345,17 @@ def start_game_logic(username):
             # Advance ambient bubbles: same world scroll + their own upward drift
             live_ambient = []
             for b in ambient_bubbles:
-                b[0] -= speed
-                b[1] -= b[2]
+                b[0] -= speed * dt * FRAME_SCALE * 0.25
+                b[1] -= b[2] * dt * FRAME_SCALE * 0.25
                 if b[0] > -2 and b[1] > 0:
                     live_ambient.append(b)
             ambient_bubbles = live_ambient
 
             # 11. UPDATE DECORATIVE JELLYFISH
-            _jf_spawn_timer += 1
+            _jf_spawn_timer += dt * FRAME_SCALE
             if _jf_spawn_timer >= _next_jf_spawn:
                 _jf_spawn_timer = 0
-                _next_jf_spawn = random.randint(80, 160)
+                _next_jf_spawn = random.randint(8, 10) * FRAME_SCALE
                 spawn_y = float(random.randint(int(game_height * 0.35), int(game_height * 0.75)))
                 # [x, y, frame, jump_timer, jump_cooldown, vy]
                 # Start with vy = 0; gravity will slowly pull down until first thrust.
@@ -351,28 +363,28 @@ def start_game_logic(username):
                                     random.randint(15, 35), 0.0])
 
             jf_speed = spawner._speed
-            JF_GRAVITY   = 0.04 / 1.5   # rows/frame^2 — 1.5× slower slide-down
+            JF_GRAVITY   = gravity  # rows/frame^2 — 1.5× slower slide-down
             JF_MAX_DRIFT = 0.30   # cap downward drift speed
 
             live_jf = []
             for jf in jellyfishes:
-                jf[0] -= jf_speed   # scroll left at obstacle speed
-                jf[1] += jf[5]      # apply current vy
+                jf[0] -= jf_speed * dt * FRAME_SCALE * 0.25   # scroll left at obstacle speed
+                jf[1] += jf[5] * dt * FRAME_SCALE * 0.25     # apply current vy
 
                 if jf[3] > 0:       # thrust animation in progress
-                    jf[3] -= 1
-                    if jf[3] == 0:  # thrust finished — revert to idle sprite
+                    jf[3] -= dt * FRAME_SCALE  # Convert to time-based
+                    if jf[3] <= 0:  # thrust finished — revert to idle sprite
                         jf[2] = 0
                     # No gravity during thrust; vy holds at the burst value.
                 else:
                     # Apply gravity: vy climbs toward JF_MAX_DRIFT (slide back down)
-                    jf[5] = min(jf[5] + JF_GRAVITY, JF_MAX_DRIFT)
-                    jf[4] -= 1
+                    jf[5] = min(jf[5] + JF_GRAVITY * dt, JF_MAX_DRIFT)
+                    jf[4] -= dt * FRAME_SCALE  # Convert to time-based
                     if jf[4] <= 0:  # trigger next thrust
                         jf[2] = 1
-                        jf[3] = 8
+                        jf[3] = FRAME_SCALE
                         jf[5] = -0.75   # half of the original -1.5
-                        jf[4] = random.randint(15, 35)
+                        jf[4] = random.randint(1, 3) * FRAME_SCALE
                         # Emit 5–8 thrust bubbles of varying size and spread
                         n = random.randint(5, 8)
                         for _ in range(n):
@@ -393,27 +405,27 @@ def start_game_logic(username):
             # (no upward phase — just a quick downward burst that fades out).
             live_jf_bub = []
             for b in jf_bubbles:
-                b[0] -= jf_speed   # world scroll
-                b[0] += b[2]       # own horizontal spread (vx)
-                b[1] += b[3]       # move downward by vy
-                b[3] -= 0.10       # decelerate
+                b[0] -= jf_speed * dt   # world scroll
+                b[0] += b[2] * dt * FRAME_SCALE * 0.25      # own horizontal spread (vx)
+                b[1] += b[3] * dt * FRAME_SCALE * 0.25      # move downward by vy
+                b[3] -= 0.10 * dt * FRAME_SCALE * 0.5   # decelerate (time-based)
                 if b[3] > 0.05 and b[0] > 0:   # delete when nearly stopped
                     live_jf_bub.append(b)
             jf_bubbles = live_jf_bub
 
             # 12. UPDATE DECORATIVE CRABS
-            _crab_spawn_timer += 1
+            _crab_spawn_timer += dt * FRAME_SCALE
             if _crab_spawn_timer >= _next_crab_spawn:
                 _crab_spawn_timer = 0
-                _next_crab_spawn = random.randint(120, 200)
+                _next_crab_spawn = random.randint(10, 16) * FRAME_SCALE
                 crabs.append([float(term.width + 2), 0, 0])  # x, frame, frame_timer
 
             crab_speed = spawner._speed * 1.3
             live_crabs = []
             for c in crabs:
-                c[0] -= crab_speed        # scroll left faster than obstacles
-                c[2] += 1                 # advance animation timer
-                if c[2] >= 3:            # switch sprite every 3 frames
+                c[0] -= crab_speed * dt * FRAME_SCALE * 0.25        # scroll left faster than obstacles
+                c[2] += dt * FRAME_SCALE                # advance animation timer (time-based)
+                if c[2] >= 5:                  # switch sprite every 3 frames
                     c[2] = 0
                     c[1] = 1 - c[1]      # toggle between frame 0 and 1
                 if c[0] > -crab_width:
@@ -422,12 +434,22 @@ def start_game_logic(username):
 
             # 12. RENDER
             current_high_score = max(saved_high_score, score)
-            draw(player, spawner.obstacles, score=score, high_score=current_high_score,
-                 term=term, bubbles=bubbles, ambient_bubbles=ambient_bubbles,
-                 crabs=crabs, crab_frames=crab_frames, crab_y=crab_y,
-                 jellyfishes=jellyfishes, jf_sprites=jf_sprites, jf_bubbles=jf_bubbles)
-
-            time.sleep(0.01)
+            draw(
+                player,
+                spawner.obstacles,
+                score=score,
+                high_score=current_high_score,
+                term=term,
+                bubbles=bubbles,
+                ambient_bubbles=ambient_bubbles,
+                crabs=crabs,
+                crab_frames=crab_frames,
+                crab_y=crab_y,
+                jellyfishes=jellyfishes,
+                jf_sprites=jf_sprites,
+                jf_bubbles=jf_bubbles,
+            )
+            
 
         # Game Over Pause
         game_over_text = " GAME OVER! "
