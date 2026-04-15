@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List, Tuple
 from blessed import Terminal
-from gameObjects.obstacle import Obstacle
+from gameObjects.obstacle import JellyfishObstacle, Obstacle, Tentacle
 from gameObjects.player import Player
 
 _ASSETS = Path(__file__).resolve().parent / "assets"
@@ -73,9 +73,9 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
         for b in ambient_bubbles:
             ambient_map[(round(b[0]), round(b[1]))] = b[3]
 
-    # Dim-magenta ANSI sequence for jellyfish (dark purple).
-    DIM_MAGENTA = "\033[2;35m"
-    RESET       = "\033[m"
+    # Jellyfish: bright pink (bold + 256-color) so it reads apart from yellow fish / green tentacles / red crab.
+    BRIGHT_PINK = "\033[1;38;5;207m"
+    RESET = "\033[0m"
 
     # Draw the game area — render priority (top = highest):
     #   Player > Crabs > Obstacles > Fish bubbles >
@@ -95,19 +95,21 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
             elif any(x >= round(obs.position[0]) and x < round(obs.position[0]) + obs.width
                      and y >= round(obs.position[1]) and y < round(obs.position[1]) + obs.height
                      for obs in obstacles):
-                # Obstacle sprite
+                # Obstacle sprite (tentacles = green; jellyfish obstacle = bright pink)
                 obs = next(obs for obs in obstacles
                            if x >= round(obs.position[0]) and x < round(obs.position[0]) + obs.width
                            and y >= round(obs.position[1]) and y < round(obs.position[1]) + obs.height)
-                line += (f"{term.green}"
-                         f"{obs.sprite.display[y - round(obs.position[1])][x - round(obs.position[0])]}"
-                         f"{term.normal}")
+                ch = obs.sprite.display[y - round(obs.position[1])][x - round(obs.position[0])]
+                if isinstance(obs, JellyfishObstacle):
+                    line += f"{BRIGHT_PINK}{ch}{RESET}"
+                else:
+                    line += f"{term.green}{ch}{term.normal}"
             elif (x, y) in bubble_set:
                 # Fish trail / flap bubbles
                 line += f"{term.cyan}o{term.normal}"
             elif (x, y) in jf_map:
-                # Jellyfish — dim magenta (distant/dark purple)
-                line += f"{DIM_MAGENTA}{jf_map[(x, y)]}{RESET}"
+                # Decorative jellyfish (if any) — match hazard pink
+                line += f"{BRIGHT_PINK}{jf_map[(x, y)]}{RESET}"
             elif (x, y) in jf_bubble_map:
                 # Jellyfish thrust bubbles — dim cyan (same darkness as jellyfish, blue colour)
                 line += f"\033[2;36m{jf_bubble_map[(x, y)]}{RESET}"
@@ -126,7 +128,7 @@ if __name__ == "__main__":
     score = 10
     high_score = 8
     obstacles = [
-        Obstacle(70, 19, str(_ASSETS / "tentacles_bottom.txt")),
-        Obstacle(70, -5, str(_ASSETS / "tentacles_top.txt")),
+        Tentacle(70, 19, str(_ASSETS / "tentacles_bottom.txt")),
+        Tentacle(70, -5, str(_ASSETS / "tentacles_top.txt")),
     ]
     draw(player, obstacles, score, high_score, term, bubbles=[], ambient_bubbles=[])
