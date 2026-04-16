@@ -86,17 +86,17 @@ def start_game_logic(username):
     obstacle_types = [
         ObstacleTypeConfig(
             name="static",
-            weight=1.0,
+            weight=0.5,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
         ),
         ObstacleTypeConfig(
             name="moving",
-            weight=0.0,
+            weight=0.5,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
-            amplitude=4.0,
-            frequency=0.05,
+            amplitude=5.0,
+            frequency=0.065,
         ),
     ]
 
@@ -112,7 +112,7 @@ def start_game_logic(username):
 
     # Game State
     bird_y_float = float(player.position[1])
-    gravity = 0.5
+    gravity = 0.4
     velocity = 0.0
 
     # --- Flap Cooldown State ---
@@ -262,7 +262,7 @@ def start_game_logic(username):
                 if score % 20 == 0:
                     for obs_type in spawner._types:
                         if obs_type.name == "moving":
-                            new_weight = min(obs_type.weight + 0.1, 0.4)
+                            new_weight = min(obs_type.weight + 0.1, 0.85)
                             obs_type.update_weight(new_weight)
             elif score % 10 != 0:
                 just_increased_difficulty = False
