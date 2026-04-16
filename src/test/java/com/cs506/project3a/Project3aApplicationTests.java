@@ -61,5 +61,15 @@ class Project3aApplicationTests {
     assert (pc.getScore("WittyName") == 5);
     pc.updateScore("WittyName", 7);
     assert (pc.getScore("WittyName") == 7);
+    pc.removeUser("WittyName");
+  }
+
+  //Test for get all Players
+  @Test
+  void getAllPlayersTest(){
+    int numPlayersBefore = pc.getAllPlayers().size();
+    pc.register("WittyName", "pwd");
+    assert(pc.getAllPlayers().size() == numPlayersBefore +1);
+    pc.removeUser("WittyName");
   }
 }

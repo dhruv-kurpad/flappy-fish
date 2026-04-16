@@ -1,44 +1,58 @@
 """
-Creates and updates obstacle pairs (top + bottom) for the game.
+Creates and updates obstacle pairs (top + bottom) and optional solo sprites (e.g. jellyfish).
 
-The spawner:
-  - Scrolls obstacles to the left each "frame"
-  - Removes pairs that have moved fully off the left side of the screen
-  - Spawns new pairs on a fixed schedule, up to a maximum count
-  - Picks obstacle art and gap position using randomness (optionally seeded for testing)
+Pairs share horizontal motion; when ``amplitude > 0``, both pieces share one vertical phase.
+Solo obstacles (``solo=True``) spawn one sprite that bobs with the same phase logic.
 """
 
+import math
 import random
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from gameObjects.obstacle import Obstacle
+from gameObjects.obstacle import JellyfishObstacle, Obstacle, PufferfishObstacle, Tentacle
+from gameObjects.sprite import Sprite
 
 
-# @dataclass auto-builds __init__ from the fields below (name, weight, ...).
 @dataclass
 class ObstacleTypeConfig:
-    """One style of pipe pair: which images to use and how it may move."""
+    """Tentacle pair (default) or a single bobbing sprite (``solo=True``)."""
 
     name: str
-    # Used for weighted random choice: higher weight = picked more often.
     weight: float
-    # File paths for the top and bottom obstacle sprites (see Obstacle).
     top_sprite: str
-    bottom_sprite: str
-    # If amplitude is 0, obstacles stay at their spawn height.
-    # If > 0, they bob up/down within min/max bounds (see Obstacle.update).
+    bottom_sprite: str = ""
+    solo: bool = False
     amplitude: float = 0.0
-    # How fast the sine wave advances each frame (only matters if amplitude > 0).
-    frequency: float = 0.05  # radians per frame
+    frequency: float = 0.05
 
     def update_weight(self, new_weight: float) -> None:
-        """Allows dynamic weight changes"""
         self.weight = new_weight
 
 
+@dataclass
+class SpawnedPair:
+    """One top+bottom pair sharing scroll and optional shared vertical motion."""
+
+    top: Obstacle
+    bot: Obstacle
+    amplitude: float
+    frequency: float
+    phase: float = 0.0
+
+
+@dataclass
+class SpawnedSolo:
+    """One obstacle (e.g. jellyfish) with sine bobbing."""
+
+    obs: Obstacle
+    amplitude: float
+    frequency: float
+    phase: float = 0.0
+
+
 class ObstacleSpawner:
-    """Owns all moving obstacle pairs: scrolling, spawning, and pruning."""
+    """Owns tentacle pairs and solo obstacles: scroll, bobbing, spawn, prune."""
 
     def __init__(
         self,
@@ -51,127 +65,193 @@ class ObstacleSpawner:
         max_pairs: int = 2,
         rng_seed: Optional[int] = None,
     ):
-        # How many character columns wide the terminal is (obstacles spawn just past the right edge).
         self._screen_width = screen_width
-        # Usable vertical space for placing the gap (typically terminal height minus UI rows).
         self._game_height = game_height
-        # Pixels (character columns) moved left per update() call.
         self._speed = obstacle_speed
-        # Vertical space between top and bottom obstacles, in terminal rows.
         self._gap_size = gap_size
-        # Spawn a new pair every this many calls to update() (e.g. 80 means every 80 frames).
         self._spawn_interval = spawn_interval
-        # Cap on how many top+bottom pairs can exist at once.
-        self._max_pairs = max_pairs
-        # Random number generator; pass an int seed for reproducible runs/tests.
+        # Max concurrent spawn groups (each pair OR each solo counts as one).
+        self._max_groups = max_pairs
         self._rng = random.Random(rng_seed)
 
-        # Turn weights like [3, 1] into probabilities [0.75, 0.25] for random.choices().
-        total = sum(t.weight for t in obstacle_types)
         self._types = obstacle_types
-        self._weights = [t.weight / total for t in obstacle_types]
 
-        # Each item is (top_obstacle, bottom_obstacle) for one gap.
-        self._pairs: List[Tuple[Obstacle, Obstacle]] = []
-        # Increments once per update(); used with % to decide when to spawn.
+        self._pair_list: List[SpawnedPair] = []
+        self._solo_list: List[SpawnedSolo] = []
         self._frame_counter: int = 0
 
-        # Start with one pair on screen so the player is not waiting on an empty level.
-        self._spawn_pair()
+        self._spawn()
+
+    def _group_count(self) -> int:
+        return len(self._pair_list) + len(self._solo_list)
+
+    @property
+    def _pairs(self) -> List[Tuple[Obstacle, Obstacle]]:
+        """(top, bot) only — used for pipe pass scoring (excludes jellyfish solos)."""
+        return [(p.top, p.bot) for p in self._pair_list]
 
     @property
     def obstacles(self) -> List[Obstacle]:
-        """Collision and drawing expect a single list: top1, bot1, top2, bot2, ..."""
-        result = []
-        for top, bot in self._pairs:
-            result.append(top)
-            result.append(bot)
+        result: List[Obstacle] = []
+        for pair in self._pair_list:
+            result.append(pair.top)
+            result.append(pair.bot)
+        for solo in self._solo_list:
+            result.append(solo.obs)
         return result
 
-    def update(self) -> None:
-        """Call once per game tick: move obstacles, drop off-screen pairs, maybe spawn."""
+    def update(
+        self,
+        player_x: Optional[float] = None,
+        player_width: Optional[float] = None,
+    ) -> None:
         self._frame_counter += 1
 
-        # Pairs still at least partly visible stay; fully off the left are dropped.
-        survived: List[Tuple[Obstacle, Obstacle]] = []
-        for top, bot in self._pairs:
-            # Shared x so top and bottom stay aligned horizontally.
+        survived_pairs: List[SpawnedPair] = []
+        for pair in self._pair_list:
+            top, bot = pair.top, pair.bot
             new_x = top._x_float - self._speed
             top.set_x(new_x)
             bot.set_x(new_x)
-            top.update()
-            bot.update()
-            # int(new_x) + top.width > 0 means some part of the obstacle is still on screen.
+
+            amp = float(pair.amplitude)
+            if amp > 0.0:
+                pair.phase += float(pair.frequency)
+                delta = amp * math.sin(pair.phase)
+                top.apply_vertical_offset(delta)
+                bot.apply_vertical_offset(delta)
+
             if int(new_x) + top.width > 0:
-                survived.append((top, bot))
+                survived_pairs.append(pair)
 
-        self._pairs = survived
+        self._pair_list = survived_pairs
 
-        # Every spawn_interval frames, try to add another pair if under the cap.
-        # % is remainder: True when frame_counter is 80, 160, 240, ... if interval is 80.
+        survived_solo: List[SpawnedSolo] = []
+        for solo in self._solo_list:
+            new_x = solo.obs._x_float - self._speed
+            solo.obs.set_x(new_x)
+
+            amp = float(solo.amplitude)
+            if amp > 0.0:
+                solo.phase += float(solo.frequency)
+                delta = amp * math.sin(solo.phase)
+                solo.obs.apply_vertical_offset(delta)
+
+            if isinstance(solo.obs, JellyfishObstacle):
+                solo.obs.tick_animation()
+            elif isinstance(solo.obs, PufferfishObstacle) and player_x is not None:
+                w = float(player_width) if player_width is not None else 0.0
+                solo.obs.update_inflation(player_x, w)
+
+            if int(new_x) + solo.obs.width > 0:
+                survived_solo.append(solo)
+
+        self._solo_list = survived_solo
+
         if (
             self._frame_counter % self._spawn_interval == 0
+            and self._group_count() < self._max_groups
         ):
-            self._spawn_pair()
+            self._spawn()
 
     def _pick_type(self) -> ObstacleTypeConfig:
-        """Pick one obstacle style at random, respecting weights."""
-        # choices returns a list of length k=1; [0] is that single pick.
-        return self._rng.choices(self._types, weights=self._weights, k=1)[0]
+        weights = [max(0.0, t.weight) for t in self._types]
+        return self._rng.choices(self._types, weights=weights, k=1)[0]
 
-    def _spawn_pair(self) -> None:
-        """Create one top+bottom pair off the right side with a random vertical gap."""
+    def _spawn(self) -> None:
         cfg = self._pick_type()
-        # Start just beyond the right edge so obstacles scroll into view.
+        if cfg.solo:
+            self._spawn_solo(cfg)
+        else:
+            self._spawn_tentacle_pair(cfg)
+
+    def _spawn_tentacle_pair(self, cfg: ObstacleTypeConfig) -> None:
         spawn_x = float(self._screen_width + 2)
 
-        # Build temporary obstacles only to read how tall each sprite is (rows).
-        top_tmp = Obstacle(spawn_x, 0, cfg.top_sprite)
-        bot_tmp = Obstacle(spawn_x, 0, cfg.bottom_sprite)
+        top_tmp = Tentacle(spawn_x, 0, cfg.top_sprite)
+        bot_tmp = Tentacle(spawn_x, 0, cfg.bottom_sprite)
         top_h = top_tmp.height
         bot_h = bot_tmp.height
 
-        # Pick a random vertical position for the gap center so each pair feels different.
-        # half_gap is half the gap in rows; // is integer division (whole number).
         half_gap = self._gap_size // 2
         lo = half_gap + 1
         hi = self._game_height - half_gap - 1
         if lo >= hi:
-            # Screen too small for the math; use a simpler minimum range.
             lo = top_h + 1
         gap_center = self._rng.randint(lo, max(lo, hi))
 
-        # Place top sprite so its bottom sits above the gap; bottom sprite just below gap center.
-        top_y = float(gap_center - half_gap - top_h)  # can be negative (clips off top)
+        top_y = float(gap_center - half_gap - top_h)
         bot_y = float(gap_center + half_gap)
 
-        # Limits for sine bobbing so obstacles do not cross into the gap or off-screen.
-        top_min_y = float(-(top_h - 1))
-        top_max_y = float(gap_center - half_gap - top_h + cfg.amplitude)
-        bot_min_y = float(bot_y - cfg.amplitude)
-        bot_max_y = float(self._game_height - bot_h)
+        top = Tentacle(spawn_x, top_y, cfg.top_sprite, amplitude=0.0, frequency=0.0)
+        bot = Tentacle(spawn_x, bot_y, cfg.bottom_sprite, amplitude=0.0, frequency=0.0)
 
-        top = Obstacle(
-            spawn_x, top_y, cfg.top_sprite,
-            amplitude=cfg.amplitude,
-            frequency=cfg.frequency,
-            min_y=top_min_y,
-            max_y=top_max_y,
-        )
-        bot = Obstacle(
-            spawn_x, bot_y, cfg.bottom_sprite,
-            amplitude=cfg.amplitude,
-            frequency=cfg.frequency,
-            min_y=bot_min_y,
-            max_y=bot_max_y,
+        self._pair_list.append(
+            SpawnedPair(
+                top=top,
+                bot=bot,
+                amplitude=float(cfg.amplitude),
+                frequency=float(cfg.frequency),
+            )
         )
 
-        self._pairs.append((top, bot))
-    
+    def _spawn_solo(self, cfg: ObstacleTypeConfig) -> None:
+        spawn_x = float(self._screen_width + 2)
+        if cfg.name == "pufferfish":
+            self._spawn_pufferfish(cfg, spawn_x)
+            return
+
+        tmp = JellyfishObstacle(spawn_x, 0.0, cfg.top_sprite)
+        h = tmp.height
+        margin = 1
+        y_lo = margin
+        y_hi = max(margin, self._game_height - h - margin)
+        base_y = float(self._rng.randint(y_lo, y_hi)) if y_lo <= y_hi else float(margin)
+
+        obs = JellyfishObstacle(
+            spawn_x,
+            base_y,
+            cfg.top_sprite,
+            amplitude=0.0,
+            frequency=0.0,
+        )
+
+        self._solo_list.append(
+            SpawnedSolo(
+                obs=obs,
+                amplitude=float(cfg.amplitude),
+                frequency=float(cfg.frequency),
+            )
+        )
+
+    def _spawn_pufferfish(self, cfg: ObstacleTypeConfig, spawn_x: float) -> None:
+        from pathlib import Path
+
+        assets = Path(__file__).resolve().parent.parent / "assets"
+        paths = [str(assets / f"pufferfish{i}.txt") for i in range(1, 5)]
+        max_h = max(len(Sprite(p).display) for p in paths)
+        margin = 1
+        y_lo = margin
+        y_hi = max(margin, self._game_height - max_h - margin)
+        base_y = float(self._rng.randint(y_lo, y_hi)) if y_lo <= y_hi else float(margin)
+
+        obs = PufferfishObstacle(
+            spawn_x,
+            base_y,
+            amplitude=float(cfg.amplitude),
+            frequency=float(cfg.frequency),
+        )
+
+        self._solo_list.append(
+            SpawnedSolo(
+                obs=obs,
+                amplitude=float(cfg.amplitude),
+                frequency=float(cfg.frequency),
+            )
+        )
+
     def update_obstacle_speed(self, new_speed: float) -> None:
-        """Allows dynamic speed changes"""
         self._speed = new_speed
-    
+
     def update_spawn_interval(self, new_interval: int) -> None:
-        """Allows dynamic spawn interval changes"""
         self._spawn_interval = new_interval

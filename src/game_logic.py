@@ -5,7 +5,7 @@ import random
 import subprocess
 import threading
 from pathlib import Path
-from auth import get_leaderboard
+from auth import get_leaderboard, update_score as persist_score
 from gameObjects.player import Player
 from gameObjects.obstacle_spawner import ObstacleSpawner, ObstacleTypeConfig
 from gameObjects.sprite import Sprite
@@ -70,10 +70,21 @@ def get_high_score(username):
         return 0
 
     for player in result.get("players", []):
-        if player.get("name") == username:
+        if player.get("username") == username:
             return player.get("highScore", 0)
 
     return 0
+
+
+def sync_high_score(username, score, saved_high_score):
+    if score <= saved_high_score:
+        return saved_high_score
+
+    result = persist_score(username, score)
+    if result.get("code") in (0, 1):
+        return score
+
+    return saved_high_score
 
 def start_game_logic(username):
     term = Terminal()
@@ -86,17 +97,35 @@ def start_game_logic(username):
     obstacle_types = [
         ObstacleTypeConfig(
             name="static",
-            weight=1.0,
+            weight=0.10,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
         ),
         ObstacleTypeConfig(
             name="moving",
-            weight=0.0,
+            weight=0.10,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
-            amplitude=4.0,
-            frequency=0.05,
+            amplitude=5.0,
+            frequency=0.065,
+        ),
+        ObstacleTypeConfig(
+            name="jellyfish",
+            weight=0.50,
+            top_sprite=str(ASSETS / "jellyfish.txt"),
+            bottom_sprite="",
+            solo=True,
+            amplitude=5.0,
+            frequency=0.065,
+        ),
+        ObstacleTypeConfig(
+            name="pufferfish",
+            weight=0.30,
+            top_sprite=str(ASSETS / "pufferfish1.txt"),
+            bottom_sprite="",
+            solo=True,
+            amplitude=0.0,
+            frequency=0.0,
         ),
     ]
 
@@ -183,8 +212,7 @@ def start_game_logic(username):
 
         # --- PREGAME OVERLAY ---
         draw(player, spawner.obstacles, score=0, high_score=saved_high_score, term=term,
-             bubbles=[], ambient_bubbles=[], crabs=[], crab_frames=crab_frames, crab_y=crab_y,
-             jellyfishes=[], jf_sprites=jf_sprites, jf_bubbles=[])
+             bubbles=[], ambient_bubbles=[], crabs=[], crab_frames=crab_frames, crab_y=crab_y)
         popup = " PRESS SPACE BAR TO BEGIN "
         x_pos = term.width // 2 - len(popup) // 2
         y_pos = term.height // 2
@@ -255,7 +283,7 @@ def start_game_logic(username):
             player._position = (player.position[0], int(bird_y_float))
 
             # 5. UPDATE OBSTACLES & CHECK COLLISIONS
-            spawner.update()
+            spawner.update(player.position[0], player.width)
             for obs in spawner.obstacles:
                 if check_collision(player, obs):
                     is_running = False
@@ -452,6 +480,7 @@ def start_game_logic(username):
             
 
         # Game Over Pause
+        saved_high_score = sync_high_score(username, score, saved_high_score)
         game_over_text = " GAME OVER! "
         print(term.move_xy(term.width // 2 - len(game_over_text) // 2, term.height // 2) + term.red_on_black(game_over_text), end="", flush=True)
         time.sleep(2)
