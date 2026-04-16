@@ -5,7 +5,7 @@ import random
 import subprocess
 import threading
 from pathlib import Path
-from auth import get_leaderboard
+from auth import get_leaderboard, update_score as persist_score
 from gameObjects.player import Player
 from gameObjects.obstacle_spawner import ObstacleSpawner, ObstacleTypeConfig
 from gameObjects.sprite import Sprite
@@ -70,10 +70,21 @@ def get_high_score(username):
         return 0
 
     for player in result.get("players", []):
-        if player.get("name") == username:
+        if player.get("username") == username:
             return player.get("highScore", 0)
 
     return 0
+
+
+def sync_high_score(username, score, saved_high_score):
+    if score <= saved_high_score:
+        return saved_high_score
+
+    result = persist_score(username, score)
+    if result.get("code") in (0, 1):
+        return score
+
+    return saved_high_score
 
 def start_game_logic(username):
     term = Terminal()
@@ -367,6 +378,7 @@ def start_game_logic(username):
             time.sleep(0.01)
 
         # Game Over Pause
+        saved_high_score = sync_high_score(username, score, saved_high_score)
         game_over_text = " GAME OVER! "
         print(term.move_xy(term.width // 2 - len(game_over_text) // 2, term.height // 2) + term.red_on_black(game_over_text), end="", flush=True)
         time.sleep(2)
