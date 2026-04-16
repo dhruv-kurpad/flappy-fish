@@ -86,13 +86,13 @@ def start_game_logic(username):
     obstacle_types = [
         ObstacleTypeConfig(
             name="static",
-            weight=0.35,
+            weight=0.10,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
         ),
         ObstacleTypeConfig(
             name="moving",
-            weight=0.35,
+            weight=0.10,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
             amplitude=5.0,
@@ -100,12 +100,21 @@ def start_game_logic(username):
         ),
         ObstacleTypeConfig(
             name="jellyfish",
-            weight=0.3,
+            weight=0.50,
             top_sprite=str(ASSETS / "jellyfish.txt"),
             bottom_sprite="",
             solo=True,
             amplitude=5.0,
             frequency=0.065,
+        ),
+        ObstacleTypeConfig(
+            name="pufferfish",
+            weight=0.30,
+            top_sprite=str(ASSETS / "pufferfish1.txt"),
+            bottom_sprite="",
+            solo=True,
+            amplitude=0.0,
+            frequency=0.0,
         ),
     ]
 
@@ -235,7 +244,7 @@ def start_game_logic(username):
             player._position = (player.position[0], int(bird_y_float))
 
             # 5. UPDATE OBSTACLES & CHECK COLLISIONS
-            spawner.update()
+            spawner.update(player.position[0], player.width)
             for obs in spawner.obstacles:
                 if check_collision(player, obs):
                     is_running = False

@@ -10,7 +10,8 @@ import random
 from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
-from gameObjects.obstacle import JellyfishObstacle, Obstacle, Tentacle
+from gameObjects.obstacle import JellyfishObstacle, Obstacle, PufferfishObstacle, Tentacle
+from gameObjects.sprite import Sprite
 
 
 @dataclass
@@ -99,7 +100,11 @@ class ObstacleSpawner:
             result.append(solo.obs)
         return result
 
-    def update(self) -> None:
+    def update(
+        self,
+        player_x: Optional[float] = None,
+        player_width: Optional[float] = None,
+    ) -> None:
         self._frame_counter += 1
 
         survived_pairs: List[SpawnedPair] = []
@@ -134,6 +139,9 @@ class ObstacleSpawner:
 
             if isinstance(solo.obs, JellyfishObstacle):
                 solo.obs.tick_animation()
+            elif isinstance(solo.obs, PufferfishObstacle) and player_x is not None:
+                w = float(player_width) if player_width is not None else 0.0
+                solo.obs.update_inflation(player_x, w)
 
             if int(new_x) + solo.obs.width > 0:
                 survived_solo.append(solo)
@@ -189,6 +197,10 @@ class ObstacleSpawner:
 
     def _spawn_solo(self, cfg: ObstacleTypeConfig) -> None:
         spawn_x = float(self._screen_width + 2)
+        if cfg.name == "pufferfish":
+            self._spawn_pufferfish(cfg, spawn_x)
+            return
+
         tmp = JellyfishObstacle(spawn_x, 0.0, cfg.top_sprite)
         h = tmp.height
         margin = 1
@@ -202,6 +214,32 @@ class ObstacleSpawner:
             cfg.top_sprite,
             amplitude=0.0,
             frequency=0.0,
+        )
+
+        self._solo_list.append(
+            SpawnedSolo(
+                obs=obs,
+                amplitude=float(cfg.amplitude),
+                frequency=float(cfg.frequency),
+            )
+        )
+
+    def _spawn_pufferfish(self, cfg: ObstacleTypeConfig, spawn_x: float) -> None:
+        from pathlib import Path
+
+        assets = Path(__file__).resolve().parent.parent / "assets"
+        paths = [str(assets / f"pufferfish{i}.txt") for i in range(1, 5)]
+        max_h = max(len(Sprite(p).display) for p in paths)
+        margin = 1
+        y_lo = margin
+        y_hi = max(margin, self._game_height - max_h - margin)
+        base_y = float(self._rng.randint(y_lo, y_hi)) if y_lo <= y_hi else float(margin)
+
+        obs = PufferfishObstacle(
+            spawn_x,
+            base_y,
+            amplitude=float(cfg.amplitude),
+            frequency=float(cfg.frequency),
         )
 
         self._solo_list.append(

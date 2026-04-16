@@ -1,6 +1,7 @@
 import math
 import random
 from pathlib import Path
+from typing import Optional, Tuple
 from gameObjects.game_object import GameObject
 from gameObjects.sprite import Sprite
 
@@ -143,3 +144,65 @@ class JellyfishObstacle(Obstacle):
             if self._jump_cooldown <= 0:
                 self._jump_timer = self.JUMP_SPRITE_FRAMES
                 self._jump_cooldown = random.randint(15, 35)
+
+
+class PufferfishObstacle(Obstacle):
+    """
+    Solo hazard: starts as the smallest sprite and advances through four stages as it
+    scrolls toward the player. Each stage uses a larger sprite (top-left anchor; the
+    hitbox grows downward as the art expands).
+    """
+
+    # >1.0 slows early stages slightly (1.0 = linear). Keep moderate so stages don’t bunch at the end.
+    _INFLATION_EASE_POWER = 1.45
+
+    def __init__(
+        self,
+        x: float,
+        y: float,
+        sprite_paths: Optional[Tuple[str, str, str, str]] = None,
+        amplitude: float = 0.0,
+        frequency: float = 0.0,
+        min_y: float = 0.0,
+        max_y: float = 0.0,
+    ):
+        paths = sprite_paths or tuple(str(_ASSETS / f"pufferfish{i}.txt") for i in range(1, 5))
+        self._spawn_x = float(x)
+        self._stage = 0
+        super().__init__(x, y, paths[0], amplitude, frequency, min_y, max_y)
+        self._sprites = [self._sprite] + [Sprite(p) for p in paths[1:]]
+
+    @property
+    def sprite(self) -> Sprite:
+        return self._sprites[self._stage]
+
+    def _set_stage(self, new_stage: int) -> None:
+        new_stage = max(0, min(3, int(new_stage)))
+        if new_stage == self._stage:
+            return
+        self._stage = new_stage
+        self._position = (int(self._x_float), int(round(self._y_float)))
+
+    def update_inflation(self, player_x: float, player_width: float = 0.0) -> None:
+        """Advance sprite stage from scroll progress toward the player (call each frame)."""
+        spawn_x = self._spawn_x
+        x = self._x_float
+        # p reaches 1 when the obstacle's left edge hits ``approach_end``. That point must be
+        # near the player (not near spawn): if ``approach_end`` is too far right, ``total``
+        # is tiny and inflation finishes in a few frames. Here, full size when the left edge
+        # is just past the player’s right edge (still no AABB overlap: ox >= player_right).
+        player_right = player_x + max(player_width, 1.0)
+        ahead_end = player_right + 5.0
+        approach_end = min(ahead_end, spawn_x - 6.0)
+        total = spawn_x - approach_end
+        if total <= 1e-6:
+            total = 1.0
+        traveled = spawn_x - x
+        # Stay on sprite 1 for this much scroll before stages 2–4 use the rest of the path.
+        start_delay = min(36.0, total * 0.14)
+        delayed = max(0.0, traveled - start_delay)
+        usable = max(total - start_delay, 1e-6)
+        p_linear = max(0.0, min(1.0, delayed / usable))
+        p = p_linear ** self._INFLATION_EASE_POWER
+        new_stage = min(3, int(p * 4))
+        self._set_stage(new_stage)

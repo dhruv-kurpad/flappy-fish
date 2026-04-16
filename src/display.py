@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List, Tuple
 from blessed import Terminal
-from gameObjects.obstacle import JellyfishObstacle, Obstacle, Tentacle
+from gameObjects.obstacle import JellyfishObstacle, Obstacle, PufferfishObstacle, Tentacle
 from gameObjects.player import Player
 
 _ASSETS = Path(__file__).resolve().parent / "assets"
@@ -102,6 +102,8 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
                 ch = obs.sprite.display[y - round(obs.position[1])][x - round(obs.position[0])]
                 if isinstance(obs, JellyfishObstacle):
                     line += f"{BRIGHT_PINK}{ch}{RESET}"
+                elif isinstance(obs, PufferfishObstacle):
+                    line += f"{term.yellow}{ch}{term.normal}"
                 else:
                     line += f"{term.green}{ch}{term.normal}"
             elif (x, y) in bubble_set:
