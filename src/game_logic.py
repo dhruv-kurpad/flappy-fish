@@ -86,17 +86,35 @@ def start_game_logic(username):
     obstacle_types = [
         ObstacleTypeConfig(
             name="static",
-            weight=0.5,
+            weight=0.10,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
         ),
         ObstacleTypeConfig(
             name="moving",
-            weight=0.5,
+            weight=0.10,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
             amplitude=5.0,
             frequency=0.065,
+        ),
+        ObstacleTypeConfig(
+            name="jellyfish",
+            weight=0.50,
+            top_sprite=str(ASSETS / "jellyfish.txt"),
+            bottom_sprite="",
+            solo=True,
+            amplitude=5.0,
+            frequency=0.065,
+        ),
+        ObstacleTypeConfig(
+            name="pufferfish",
+            weight=0.30,
+            top_sprite=str(ASSETS / "pufferfish1.txt"),
+            bottom_sprite="",
+            solo=True,
+            amplitude=0.0,
+            frequency=0.0,
         ),
     ]
 
@@ -139,23 +157,6 @@ def start_game_logic(username):
     _ambient_frame = 0
     _next_ambient_spawn = random.randint(40, 80)  # frames until next cluster
 
-    # --- Decorative jellyfish system ---
-    # Each jellyfish: [x, y, frame, jump_timer, jump_cooldown, vy]
-    #   frame 0 = jellyfish.txt (idle), frame 1 = jellyfishJump.txt (thrust)
-    #   jump_timer  > 0 while thrust sprite is shown
-    #   jump_cooldown counts down to the next thrust trigger
-    #   vy is current vertical velocity (negative = upward in terminal coords)
-    jf_sprites = [
-        Sprite(str(ASSETS / "jellyfish.txt")).display,
-        Sprite(str(ASSETS / "jellyfishJump.txt")).display,
-    ]
-    jf_idle_h  = len(jf_sprites[0])   # height of the idle sprite (for bubble spawn)
-    jf_idle_w  = len(jf_sprites[0][0])
-    jellyfishes: list = []
-    jf_bubbles:  list = []   # [x, y, vy, lifetime]  vy starts downward then reverses
-    _jf_spawn_timer = 0
-    _next_jf_spawn  = random.randint(80, 160)
-
     # --- Decorative crab system ---
     # Two sprite frames alternate every 3 ticks; crabs scroll left slightly
     # faster than obstacles and are pinned to the bottom of the game area.
@@ -178,8 +179,7 @@ def start_game_logic(username):
 
         # --- PREGAME OVERLAY ---
         draw(player, spawner.obstacles, score=0, high_score=saved_high_score, term=term,
-             bubbles=[], ambient_bubbles=[], crabs=[], crab_frames=crab_frames, crab_y=crab_y,
-             jellyfishes=[], jf_sprites=jf_sprites, jf_bubbles=[])
+             bubbles=[], ambient_bubbles=[], crabs=[], crab_frames=crab_frames, crab_y=crab_y)
         popup = " PRESS SPACE BAR TO BEGIN "
         x_pos = term.width // 2 - len(popup) // 2
         y_pos = term.height // 2
@@ -244,7 +244,7 @@ def start_game_logic(username):
             player._position = (player.position[0], int(bird_y_float))
 
             # 5. UPDATE OBSTACLES & CHECK COLLISIONS
-            spawner.update()
+            spawner.update(player.position[0], player.width)
             for obs in spawner.obstacles:
                 if check_collision(player, obs):
                     is_running = False
@@ -339,69 +339,7 @@ def start_game_logic(username):
                     live_ambient.append(b)
             ambient_bubbles = live_ambient
 
-            # 11. UPDATE DECORATIVE JELLYFISH
-            _jf_spawn_timer += 1
-            if _jf_spawn_timer >= _next_jf_spawn:
-                _jf_spawn_timer = 0
-                _next_jf_spawn = random.randint(80, 160)
-                spawn_y = float(random.randint(int(game_height * 0.35), int(game_height * 0.75)))
-                # [x, y, frame, jump_timer, jump_cooldown, vy]
-                # Start with vy = 0; gravity will slowly pull down until first thrust.
-                jellyfishes.append([float(term.width + 2), spawn_y, 0, 0,
-                                    random.randint(15, 35), 0.0])
-
-            jf_speed = spawner._speed
-            JF_GRAVITY   = 0.04 / 1.5   # rows/frame^2 — 1.5× slower slide-down
-            JF_MAX_DRIFT = 0.30   # cap downward drift speed
-
-            live_jf = []
-            for jf in jellyfishes:
-                jf[0] -= jf_speed   # scroll left at obstacle speed
-                jf[1] += jf[5]      # apply current vy
-
-                if jf[3] > 0:       # thrust animation in progress
-                    jf[3] -= 1
-                    if jf[3] == 0:  # thrust finished — revert to idle sprite
-                        jf[2] = 0
-                    # No gravity during thrust; vy holds at the burst value.
-                else:
-                    # Apply gravity: vy climbs toward JF_MAX_DRIFT (slide back down)
-                    jf[5] = min(jf[5] + JF_GRAVITY, JF_MAX_DRIFT)
-                    jf[4] -= 1
-                    if jf[4] <= 0:  # trigger next thrust
-                        jf[2] = 1
-                        jf[3] = 8
-                        jf[5] = -0.75   # half of the original -1.5
-                        jf[4] = random.randint(15, 35)
-                        # Emit 5–8 thrust bubbles of varying size and spread
-                        n = random.randint(5, 8)
-                        for _ in range(n):
-                            bx  = float(jf[0] + jf_idle_w // 2 + random.randint(-3, 3))
-                            by  = float(jf[1] + jf_idle_h)
-                            vx  = random.uniform(-0.25, 0.25)   # horizontal spread
-                            vy  = random.uniform(0.7, 1.8)      # downward speed
-                            ch  = random.choice(['O', 'o', 'o']) # mostly small, some large
-                            jf_bubbles.append([bx, by, vx, vy, ch])
-
-                if jf[0] > -jf_idle_w and jf[1] > -jf_idle_h:
-                    live_jf.append(jf)
-            jellyfishes = live_jf
-
-            # Update jellyfish thrust bubbles:
-            # [x, y, vx, vy, char]
-            # vy decelerates each frame; bubble is removed when vy reaches ~0
-            # (no upward phase — just a quick downward burst that fades out).
-            live_jf_bub = []
-            for b in jf_bubbles:
-                b[0] -= jf_speed   # world scroll
-                b[0] += b[2]       # own horizontal spread (vx)
-                b[1] += b[3]       # move downward by vy
-                b[3] -= 0.10       # decelerate
-                if b[3] > 0.05 and b[0] > 0:   # delete when nearly stopped
-                    live_jf_bub.append(b)
-            jf_bubbles = live_jf_bub
-
-            # 12. UPDATE DECORATIVE CRABS
+            # 11. UPDATE DECORATIVE CRABS
             _crab_spawn_timer += 1
             if _crab_spawn_timer >= _next_crab_spawn:
                 _crab_spawn_timer = 0
@@ -424,8 +362,7 @@ def start_game_logic(username):
             current_high_score = max(saved_high_score, score)
             draw(player, spawner.obstacles, score=score, high_score=current_high_score,
                  term=term, bubbles=bubbles, ambient_bubbles=ambient_bubbles,
-                 crabs=crabs, crab_frames=crab_frames, crab_y=crab_y,
-                 jellyfishes=jellyfishes, jf_sprites=jf_sprites, jf_bubbles=jf_bubbles)
+                 crabs=crabs, crab_frames=crab_frames, crab_y=crab_y)
 
             time.sleep(0.01)
 
