@@ -205,6 +205,9 @@ def start_game_logic(username):
     _crab_spawn_timer  = 0
     _next_crab_spawn   = random.randint(10, 12) * FRAME_SCALE
 
+    _tentacle_frame = 0
+    _tentacle_anim_timer = 0
+
     is_running = True
 
     with term.fullscreen(), term.cbreak(), term.hidden_cursor():
@@ -212,7 +215,8 @@ def start_game_logic(username):
 
         # --- PREGAME OVERLAY ---
         draw(player, spawner.obstacles, score=0, high_score=saved_high_score, term=term,
-             bubbles=[], ambient_bubbles=[], crabs=[], crab_frames=crab_frames, crab_y=crab_y)
+             bubbles=[], ambient_bubbles=[], crabs=[], crab_frames=crab_frames, crab_y=crab_y,
+             tentacle_frame=_tentacle_frame)
         popup = " PRESS SPACE BAR TO BEGIN "
         x_pos = term.width // 2 - len(popup) // 2
         y_pos = term.height // 2
@@ -460,6 +464,11 @@ def start_game_logic(username):
                     live_crabs.append(c)
             crabs = live_crabs
 
+            _tentacle_anim_timer += dt
+            if _tentacle_anim_timer >= 0.4:
+                _tentacle_frame = 1 - _tentacle_frame
+                _tentacle_anim_timer = 0
+
             # 12. RENDER
             current_high_score = max(saved_high_score, score)
             draw(
@@ -476,6 +485,7 @@ def start_game_logic(username):
                 jellyfishes=jellyfishes,
                 jf_sprites=jf_sprites,
                 jf_bubbles=jf_bubbles,
+                tentacle_frame=_tentacle_frame
             )
             
 

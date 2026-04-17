@@ -17,7 +17,7 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
          bubbles: list = None, ambient_bubbles: list = None,
          crabs: list = None, crab_frames: list = None, crab_y: int = 0,
          jellyfishes: list = None, jf_sprites: list = None,
-         jf_bubbles: list = None):
+         jf_bubbles: list = None, tentacle_frame: int = 0):
     output = term.home
     output += "\n"
 
@@ -99,12 +99,33 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
                 obs = next(obs for obs in obstacles
                            if x >= round(obs.position[0]) and x < round(obs.position[0]) + obs.width
                            and y >= round(obs.position[1]) and y < round(obs.position[1]) + obs.height)
-                ch = obs.sprite.display[y - round(obs.position[1])][x - round(obs.position[0])]
+                
+                local_x = x - round(obs.position[0])
+                local_y = y - round(obs.position[1])
+                row = obs.sprite.display[local_y]
+                
                 if isinstance(obs, JellyfishObstacle):
+                    ch = row[local_x] if local_x < len(row) else ' '
                     line += f"{BRIGHT_PINK}{ch}{RESET}"
                 elif isinstance(obs, PufferfishObstacle):
+                    ch = row[local_x] if local_x < len(row) else ' '
                     line += f"{term.yellow}{ch}{term.normal}"
                 else:
+                    if tentacle_frame == 1:
+                        row_str = "".join(row)
+                        half = len(row_str) // 2
+                        left_leg = row_str[:half]
+                        right_leg = row_str[half:]
+                        
+                        swap_map = str.maketrans(r"/\()<>[]{}", r"\/)(><][}{")
+                        left_leg = left_leg[::-1].translate(swap_map)
+                        right_leg = right_leg[::-1].translate(swap_map)
+                        
+                        new_row = list(left_leg + right_leg)
+                        ch = new_row[local_x] if local_x < len(new_row) else ' '
+                    else:
+                        ch = row[local_x] if local_x < len(row) else ' '
+                        
                     line += f"{term.green}{ch}{term.normal}"
             elif (x, y) in bubble_set:
                 # Fish trail / flap bubbles
@@ -133,4 +154,4 @@ if __name__ == "__main__":
         Tentacle(70, 19, str(_ASSETS / "tentacles_bottom.txt")),
         Tentacle(70, -5, str(_ASSETS / "tentacles_top.txt")),
     ]
-    draw(player, obstacles, score, high_score, term, bubbles=[], ambient_bubbles=[])
+    draw(player, obstacles, score, high_score, term, bubbles=[], ambient_bubbles=[], tentacle_frame=0)
