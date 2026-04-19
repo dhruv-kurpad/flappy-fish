@@ -13,7 +13,7 @@ class Player(GameObject):
         self._position = (x, y)
         self._normal_sprite = Sprite(str(_ASSETS / "fish.txt"))
         self._jump_sprite   = Sprite(str(_ASSETS / "fishJump.txt"))
-        self._dead_sprite   = Sprite(str(_ASSETS / "fishJump.txt"))
+        self._dead_sprite   = Sprite(str(_ASSETS / "fishDead.txt"))
         self._sprite = self._normal_sprite
 
     @property
