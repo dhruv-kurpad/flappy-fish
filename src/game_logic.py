@@ -92,6 +92,7 @@ def start_game_logic(username):
 
     # --- Create Game Objects ---
     player = Player(term.width // 2 - 7, term.height // 2)
+    player.set_dead(False)
     game_height = term.height - HEADER_LINES - 1
 
     obstacle_types = [
@@ -290,6 +291,7 @@ def start_game_logic(username):
             spawner.update(player.position[0], player.width)
             for obs in spawner.obstacles:
                 if check_collision(player, obs):
+                    player.set_dead(True)
                     is_running = False
             # 6. UPDATE SCORE
             score = update_score(player, spawner._pairs, passed_pairs, score)

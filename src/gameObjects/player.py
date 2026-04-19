@@ -13,6 +13,7 @@ class Player(GameObject):
         self._position = (x, y)
         self._normal_sprite = Sprite(str(_ASSETS / "fish.txt"))
         self._jump_sprite   = Sprite(str(_ASSETS / "fishJump.txt"))
+        self._dead_sprite   = Sprite(str(_ASSETS / "fishJump.txt"))
         self._sprite = self._normal_sprite
 
     @property
@@ -26,6 +27,10 @@ class Player(GameObject):
     def set_jumping(self, jumping: bool) -> None:
         """Switch between the jump sprite and the normal idle sprite."""
         self._sprite = self._jump_sprite if jumping else self._normal_sprite
+
+    def set_dead(self, dead: bool) -> None:
+        """Switch between the jump sprite and the normal idle sprite."""
+        self._sprite = self._dead_sprite if dead else self._normal_sprite
 
     def update(self) -> None:
         pass
