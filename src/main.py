@@ -85,7 +85,7 @@ RST = Style.RESET_ALL
 
 # ── ASCII Banner ─────────────────────────────────────────────────────────────
 BANNER = (
-    f"\n{Y}"
+    f"{Y}"
     "   ███████╗██╗      █████╗ ██████╗ ██████╗ ██╗   ██╗\n"
     "   ██╔════╝██║     ██╔══██╗██╔══██╗██╔══██╗╚██╗ ██╔╝\n"
     "   █████╗  ██║     ███████║██████╔╝██████╔╝ ╚████╔╝ \n"
@@ -98,7 +98,7 @@ BANNER = (
     "           █████╗  ██║███████╗███████║\n"
     "           ██╔══╝  ██║╚════██║██╔══██║\n"
     "           ██║     ██║███████║██║  ██║\n"
-    f"           ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝ {RST}\n"
+    f"           ╚═╝     ╚═╝╚══════╝╚═╝  ╚═╝ {RST}"
 )
 
 current_user = None
@@ -148,6 +148,41 @@ def _flush_stdin():
             pass
 
 
+def _pad():
+    try:
+        cols, _ = os.get_terminal_size()
+    except OSError:
+        cols = 80
+    return " " * max(0, (cols - 60) // 2)
+
+
+def mprint(*args, sep=" ", end="\n", **kwargs):
+    margin = _pad()
+    text = sep.join(str(a) for a in args)
+    padded_text = text.replace("\n", "\n" + margin)
+    print(margin + padded_text, end=end, **kwargs)
+
+
+CLEAR_SCREEN = "\033[2J\033[H"
+
+
+def clear_screen(show_banner=False, content_lines=0):
+    print(CLEAR_SCREEN, end="", flush=True)
+    if content_lines > 0:
+        try:
+            _, lines = os.get_terminal_size()
+        except OSError:
+            lines = 24
+        pad_top = max(0, (lines - content_lines) // 2)
+        print("\n" * pad_top, end="")
+        
+    if show_banner:
+        margin = _pad()
+        for line in BANNER.split('\n'):
+            print(margin + line)
+        print()
+
+
 def _animated_input() -> str:
     """Blinking ><> fish as the prompt cursor: yellow → blank → cyan → blank → …"""
     stop = threading.Event()
@@ -160,8 +195,9 @@ def _animated_input() -> str:
         "   ",
     ]
 
+    margin = _pad()
     # Print initial prompt: 2-space indent + yellow fish + 1 space
-    sys.stdout.write(f"  {states[0]} ")
+    sys.stdout.write(f"{margin}  {states[0]} ")
     sys.stdout.flush()
 
     def _animate():
@@ -170,8 +206,9 @@ def _animated_input() -> str:
             time.sleep(0.25)
             tick += 1
             fish = states[tick % len(states)]
+            col_offset = len(margin) + 2
             # Save cursor → jump to fish position (col 3) → rewrite → restore
-            sys.stdout.write(f"\033[s\r\033[2C{fish}\033[u")
+            sys.stdout.write(f"\033[s\r\033[{col_offset}C{fish}\033[u")
             sys.stdout.flush()
 
     t = threading.Thread(target=_animate, daemon=True)
@@ -193,6 +230,54 @@ def _menu_input() -> str:
     val = _animated_input()
     _play_sfx("button_click")
     return val
+
+
+def _input_with_sfx(prompt: str = "") -> str:
+    """Plain input() that plays a button click sound when Enter is pressed."""
+    val = input(_pad() + prompt)
+    _play_sfx("button_click")
+    return val
+
+
+def _typewriter(text, delay=0.03, color=""):
+    """Print text character by character. Pass a full ANSI color code via color=;
+    it is written atomically before the loop so the terminal never sees a partial escape sequence."""
+    margin = _pad()
+    if text.startswith("\n"):
+        sys.stdout.write("\n" + margin)
+        text = text[1:]
+    else:
+        sys.stdout.write(margin)
+        
+    if color:
+        sys.stdout.write(color)
+        sys.stdout.flush()
+    for ch in text:
+        sys.stdout.write(ch)
+        sys.stdout.flush()
+        time.sleep(delay)
+    if color:
+        sys.stdout.write(RST)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+
+
+def _typewrite_option(prefix: str, label: str, delay: float = 0.018):
+    """Print one menu option: prefix (with colour codes) instantly, label char-by-char."""
+    margin = _pad()
+    sys.stdout.write(margin + prefix)
+    sys.stdout.flush()
+    for ch in label:
+        sys.stdout.write(ch)
+        sys.stdout.flush()
+        time.sleep(delay)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+
+
+def pause_after_message():
+    print()
+    _input_with_sfx(f"  {DIM}Press Enter to continue...{RST}")
 
 
 # ── Intro Animation ───────────────────────────────────────────────────────────
@@ -253,7 +338,7 @@ def show_intro():
 
             # skip hint at bottom
             hint = f"{DIM}Press any key to skip{RST}"
-            out.append(term.move_xy(0, H) + hint)
+            out.append(term.move_xy((W - 21) // 2, H) + hint)
 
             # bubbles — cyan, matching the "FISH" half of the banner
             for bx, by, _ in bubbles:
@@ -290,90 +375,33 @@ MEDALS = {
     3: f"{Fore.RED}{BRT}[3RD]{RST}",
 }
 
-CLEAR_SCREEN = "\033[2J\033[H"
-
-
-def clear_screen(show_banner=False):
-    # Use ANSI clear+home so each screen render starts from a clean frame.
-    print(CLEAR_SCREEN, end="", flush=True)
-    if show_banner:
-        print(BANNER)
-
-
-def _vcenter_pad(content_lines: int = 1):
-    """Print blank lines so that `content_lines` rows appear vertically centered."""
-    try:
-        term_h = os.get_terminal_size().lines
-    except OSError:
-        term_h = 24
-    pad = max(0, (term_h - content_lines) // 2)
-    print("\n" * pad, end="")
-
-
-def _typewriter(text, delay=0.03, color=""):
-    """Print text character by character. Pass a full ANSI color code via color=;
-    it is written atomically before the loop so the terminal never sees a partial escape sequence."""
-    if color:
-        sys.stdout.write(color)
-        sys.stdout.flush()
-    for ch in text:
-        sys.stdout.write(ch)
-        sys.stdout.flush()
-        time.sleep(delay)
-    if color:
-        sys.stdout.write(RST)
-    sys.stdout.write("\n")
-    sys.stdout.flush()
-
-
-def _typewrite_option(prefix: str, label: str, delay: float = 0.018):
-    """Print one menu option: prefix (with colour codes) instantly, label char-by-char."""
-    sys.stdout.write(prefix)
-    sys.stdout.flush()
-    for ch in label:
-        sys.stdout.write(ch)
-        sys.stdout.flush()
-        time.sleep(delay)
-    sys.stdout.write("\n")
-    sys.stdout.flush()
-
-def _input_with_sfx(prompt: str = "") -> str:
-    """Plain input() that plays a button click sound when Enter is pressed."""
-    val = input(prompt)
-    _play_sfx("button_click")
-    return val
-
-
-def pause_after_message():
-    _input_with_sfx(f"\n{DIM}Press Enter to continue...{RST}")
-
 
 # ── Display Menu ─────────────────────────────────────────────────────────────
 def _draw_menu(options, selected_idx=None, animate=False):
     """Render the full menu. When selected_idx is set, box that option."""
-    clear_screen(show_banner=True)
-    print(f"\n{Y}{'═' * 32}{RST}")
-    print(f"  {Y}{BRT}        FLAPPY  FISH{RST}")
-    print(f"{Y}{'═' * 32}{RST}")
+    clear_screen(show_banner=True, content_lines=24)
+    mprint(f"\n{Y}{'═' * 32}{RST}")
+    mprint(f"  {Y}{BRT}        FLAPPY  FISH{RST}")
+    mprint(f"{Y}{'═' * 32}{RST}")
 
     if current_user:
-        print(f"  {G}● Logged in as: {BRT}{current_user}{RST}")
-        print(f"{Y}{'─' * 32}{RST}")
+        mprint(f"  {G}● Logged in as: {BRT}{current_user}{RST}")
+        mprint(f"{Y}{'─' * 32}{RST}")
 
     for i, (_, label) in enumerate(options):
         if i == selected_idx:
             inner  = f"  {i + 1}. {label}  "
             border = "─" * len(inner)
-            print(f"  {Y}{BRT}┌{border}┐{RST}")
-            print(f"  {Y}{BRT}│{inner}│{RST}")
-            print(f"  {Y}{BRT}└{border}┘{RST}")
+            mprint(f"  {Y}{BRT}┌{border}┐{RST}")
+            mprint(f"  {Y}{BRT}│{inner}│{RST}")
+            mprint(f"  {Y}{BRT}└{border}┘{RST}")
         elif animate:
             _typewrite_option(f"  {C}{i + 1}.{RST} ", label)
         else:
-            print(f"  {C}{i + 1}.{RST} {label}")
+            mprint(f"  {C}{i + 1}.{RST} {label}")
 
-    print(f"  {DIM}{len(options) + 1}. Remove User (DEBUG){RST}")
-    print(f"{Y}{'═' * 32}{RST}")
+    mprint(f"  {DIM}{len(options) + 1}. Remove User (DEBUG){RST}")
+    mprint(f"{Y}{'═' * 32}{RST}")
 
 
 def show_menu():
@@ -416,11 +444,11 @@ def show_menu():
 
 # ── Game rules screen ────────────────────────────────────────────────────────
 def show_rules():
-    clear_screen()
-    print(f"\n{C}{'═' * 42}{RST}")
-    print(f"  {Y}{BRT}HOW TO PLAY{RST}")
-    print(f"{C}{'═' * 42}{RST}")
-    print(f"""
+    clear_screen(content_lines=22)
+    mprint(f"\n{C}{'═' * 42}{RST}")
+    mprint(f"  {Y}{BRT}HOW TO PLAY{RST}")
+    mprint(f"{C}{'═' * 42}{RST}")
+    mprint(f"""
   {W}Objective:{RST}
     Guide your fish through the gaps between
     pipes and survive as long as possible.
@@ -438,10 +466,10 @@ def show_rules():
     • Gravity pulls you down constantly.
     • The pipes move faster over time.
 """)
-    print(f"{C}{'═' * 42}{RST}")
+    mprint(f"{C}{'═' * 42}{RST}")
     _typewrite_option(f"  {C}1.{RST} ", "Start game")
     _typewrite_option(f"  {C}2.{RST} ", "Back to main menu")
-    print(f"{C}{'═' * 42}{RST}")
+    mprint(f"{C}{'═' * 42}{RST}")
     choice = _menu_input()
     if choice != "1":
         return False
@@ -453,6 +481,7 @@ def show_rules():
 
 # ── Core game logic function ─────────────────────────────────────────────────
 def start_game(username):
+    clear_screen(content_lines=3)
     _typewriter(f"Welcome, {username}! Get ready...", delay=0.04, color=G)
     pause_after_message()
     first_run = True
@@ -462,20 +491,22 @@ def start_game(username):
                 _bgm.switch("menu_bgm")
                 return
             first_run = False
-        clear_screen()
-        print(f"{Y}--- GAME STARTING ---{RST}")
-        print(" (control options) ")
+        
+        clear_screen(content_lines=5)
+        mprint(f"{Y}--- GAME STARTING ---{RST}")
+        mprint(" (control options) ")
+        
         _bgm.switch("game_bgm")
         start_game_logic(username)
         _bgm.switch("menu_bgm")
 
-        clear_screen()
-        print(f"\n{R}{'═' * 32}{RST}")
-        print(f"  {R}{BRT}    GAME  OVER{RST}")
-        print(f"{R}{'═' * 32}{RST}")
+        clear_screen(content_lines=10)
+        mprint(f"\n{R}{'═' * 32}{RST}")
+        mprint(f"  {R}{BRT}    GAME  OVER{RST}")
+        mprint(f"{R}{'═' * 32}{RST}")
         _typewrite_option(f"  {C}1.{RST} ", "Play again")
         _typewrite_option(f"  {C}2.{RST} ", "Back to main menu")
-        print(f"{R}{'═' * 32}{RST}")
+        mprint(f"{R}{'═' * 32}{RST}")
         choice = _menu_input()
         if choice != "1":
             return False
@@ -489,12 +520,12 @@ def _print_leaderboard_page(players, page, highlight_username=None):
     end = min(start + PAGE_SIZE, len(players))
     total_pages = (len(players) + PAGE_SIZE - 1) // PAGE_SIZE
 
-    print(f"\n{C}{'═' * 38}{RST}")
-    print(f"  {Y}{BRT}   LEADERBOARD{RST}  "
+    mprint(f"\n{C}{'═' * 38}{RST}")
+    mprint(f"  {Y}{BRT}   LEADERBOARD{RST}  "
           f"{DIM}(Page {page + 1}/{total_pages}){RST}")
-    print(f"{C}{'═' * 38}{RST}")
-    print(f"  {BRT}{'Rank':<8}{'Player':<15}{'Score'}{RST}")
-    print(f"{C}{'-' * 38}{RST}")
+    mprint(f"{C}{'═' * 38}{RST}")
+    mprint(f"  {BRT}{'Rank':<8}{'Player':<15}{'Score'}{RST}")
+    mprint(f"{C}{'-' * 38}{RST}")
 
     for i in range(start, end):
         rank = i + 1
@@ -505,25 +536,27 @@ def _print_leaderboard_page(players, page, highlight_username=None):
         row = f"{medal} {rank:<4} {username:<15}{score}"
 
         if highlight_username and username == highlight_username:
-            print(f"{Y}{'>' * 38}{RST}")
-            print(f"  {row}")
-            print(f"{Y}{'>' * 38}{RST}")
+            mprint(f"{Y}{'>' * 38}{RST}")
+            mprint(f"  {row}")
+            mprint(f"{Y}{'>' * 38}{RST}")
         elif rank == 1:
-            print(f"  {Y}{BRT}{row}{RST}")
+            mprint(f"  {Y}{BRT}{row}{RST}")
         elif rank == 2:
-            print(f"  {W}{BRT}{row}{RST}")
+            mprint(f"  {W}{BRT}{row}{RST}")
         elif rank == 3:
-            print(f"  {Fore.RED}{BRT}{row}{RST}")
+            mprint(f"  {Fore.RED}{BRT}{row}{RST}")
         else:
-            print(f"  {row}")
+            mprint(f"  {row}")
 
-    print(f"{C}{'═' * 38}{RST}")
+    mprint(f"{C}{'═' * 38}{RST}")
 
 
 def _search_player(players):
     """Ask for username, clear screen, then display result. Returns True if found."""
+    clear_screen(content_lines=15)
     username = _input_with_sfx(f"  {C}Enter username to search: {RST}").strip()
-    clear_screen()
+    clear_screen(content_lines=15)
+    
     if not username:
         _typewriter("  No username entered.", color=R)
         return False
@@ -540,11 +573,11 @@ def _search_player(players):
     context_end = min(len(players), idx + 3)
     context_players = players[context_start:context_end]
 
-    print(f"\n{C}{'═' * 38}{RST}")
-    print(f"  {Y}{BRT}SEARCH RESULT: {username}{RST}")
-    print(f"{C}{'═' * 38}{RST}")
-    print(f"  {BRT}{'Rank':<8}{'Player':<15}{'Score'}{RST}")
-    print(f"{C}{'-' * 38}{RST}")
+    mprint(f"\n{C}{'═' * 38}{RST}")
+    mprint(f"  {Y}{BRT}SEARCH RESULT: {username}{RST}")
+    mprint(f"{C}{'═' * 38}{RST}")
+    mprint(f"  {BRT}{'Rank':<8}{'Player':<15}{'Score'}{RST}")
+    mprint(f"{C}{'-' * 38}{RST}")
 
     for i, player in enumerate(context_players):
         rank = context_start + i + 1
@@ -552,33 +585,33 @@ def _search_player(players):
         score = player.get("highScore", 0)
         row = f"{rank:<8}{uname:<15}{score}"
         if uname == username:
-            print(f"{Y}  +{'─' * 34}+{RST}")
-            print(f"{Y}  | {row:<34}|{RST}")
-            print(f"{Y}  +{'─' * 34}+{RST}")
+            mprint(f"{Y}  +{'─' * 34}+{RST}")
+            mprint(f"{Y}  | {row:<34}|{RST}")
+            mprint(f"{Y}  +{'─' * 34}+{RST}")
         else:
-            print(f"    {row}")
+            mprint(f"    {row}")
 
-    print(f"{C}{'═' * 38}{RST}")
+    mprint(f"{C}{'═' * 38}{RST}")
     return True
 
 
 def display_leaderboard():
-    clear_screen()
+    clear_screen(content_lines=5)
     result = get_leaderboard()
 
     if not result["success"]:
-        _typewriter(f"\n{'═' * 38}", color=R)
-        _typewriter(f"Error: {result['message']}", color=R)
-        _typewriter(f"{'═' * 38}\n", color=R)
+        mprint(f"\n{R}{'═' * 38}{RST}")
+        mprint(f"{R}Error: {result['message']}{RST}")
+        mprint(f"{R}{'═' * 38}\n{RST}")
         pause_after_message()
         return
 
     players = result["players"]
 
     if not players:
-        _typewriter(f"\n{'═' * 38}", color=Y)
-        _typewriter("  No leaderboard data available yet.")
-        _typewriter(f"{'═' * 38}\n", color=Y)
+        mprint(f"\n{Y}{'═' * 38}{RST}")
+        mprint(f"{Y}  No leaderboard data available yet.{RST}")
+        mprint(f"{Y}{'═' * 38}\n{RST}")
         pause_after_message()
         return
 
@@ -586,7 +619,7 @@ def display_leaderboard():
     total_pages = (len(players) + PAGE_SIZE - 1) // PAGE_SIZE
 
     while True:
-        clear_screen()
+        clear_screen(content_lines=25)
         _print_leaderboard_page(players, page)
 
         has_prev = page > 0
@@ -601,7 +634,7 @@ def display_leaderboard():
         options.append(("search", "Search player"))
         options.append(("back", "Back to main menu"))
 
-        print()
+        mprint()
         for i, (_, label) in enumerate(options, start=1):
             _typewrite_option(f"  {C}{i}.{RST} ", label)
 
@@ -619,7 +652,6 @@ def display_leaderboard():
         elif action == "next":
             page += 1
         elif action == "goto":
-            # Keep leaderboard visible; ask for page number inline below it
             target = _input_with_sfx(f"  Enter page number (1-{total_pages}): ").strip()
             if target.isdigit() and 1 <= int(target) <= total_pages:
                 page = int(target) - 1
@@ -632,7 +664,7 @@ def display_leaderboard():
         elif action == "search":
             _search_player(players)
             while True:
-                print()
+                mprint()
                 _typewrite_option(f"  {C}1.{RST} ", "Back to leaderboard")
                 _typewrite_option(f"  {C}2.{RST} ", "Search player")
                 _typewrite_option(f"  {C}3.{RST} ", "Back to main menu")
@@ -741,14 +773,15 @@ def main():
                 display_leaderboard()
 
             elif action == "logout":
+                clear_screen(content_lines=3)
                 _typewriter(f"Logged out. See you, {current_user}!", color=G)
                 current_user = None
                 pause_after_message()
 
             elif action == "exit":
                 _bgm.stop()
+                clear_screen(content_lines=3)
                 _typewriter("Goodbye! See you next time ~", delay=0.04, color=Y)
-                clear_screen()
                 sys.exit()
 
             elif action == "remove":
@@ -765,12 +798,12 @@ def main():
             # TESTING CODE
 
             else:
-                clear_screen()
+                clear_screen(content_lines=3)
                 _typewriter("Invalid choice, try again.", color=R)
                 pause_after_message()
     except (KeyboardInterrupt, EOFError):
         _bgm.stop()
-        print(f"\n{Y}Exiting...{RST}")
+        mprint(f"\n{Y}Exiting...{RST}")
         sys.exit(0)
 
 
