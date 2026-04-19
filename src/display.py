@@ -73,8 +73,9 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
         for b in ambient_bubbles:
             ambient_map[(round(b[0]), round(b[1]))] = b[3]
 
+    BG_BLUE = "\033[48;5;24m"
     # Jellyfish: bright pink (bold + 256-color) so it reads apart from yellow fish / green tentacles / red crab.
-    BRIGHT_PINK = "\033[1;38;5;207m"
+    BRIGHT_PINK = "\033[1;38;5;207;48;5;24m"
     RESET = "\033[0m"
 
     # Draw the game area — render priority (top = highest):
@@ -86,12 +87,12 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
             if (x >= round(player.position[0]) and x < round(player.position[0]) + player.width
                     and y >= round(player.position[1]) and y < round(player.position[1]) + player.height):
                 # Player sprite — highest priority
-                line += (f"{term.yellow}"
+                line += (f"{term.yellow}{BG_BLUE}"
                          f"{player.sprite.display[y - round(player.position[1])][x - round(player.position[0])]}"
                          f"{term.normal}")
             elif (x, y) in crab_map:
                 # Crab — in front of obstacles so it appears at the foreground bottom
-                line += f"{term.red}{crab_map[(x, y)]}{term.normal}"
+                line += f"{term.red}{BG_BLUE}{crab_map[(x, y)]}{term.normal}"
             elif any(x >= round(obs.position[0]) and x < round(obs.position[0]) + obs.width
                      and y >= round(obs.position[1]) and y < round(obs.position[1]) + obs.height
                      for obs in obstacles):
@@ -109,7 +110,7 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
                     line += f"{BRIGHT_PINK}{ch}{RESET}"
                 elif isinstance(obs, PufferfishObstacle):
                     ch = row[local_x] if local_x < len(row) else ' '
-                    line += f"{term.yellow}{ch}{term.normal}"
+                    line += f"{term.yellow}{BG_BLUE}{ch}{term.normal}"
                 else:
                     if tentacle_frame == 1:
                         row_str = "".join(row)
@@ -126,21 +127,21 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
                     else:
                         ch = row[local_x] if local_x < len(row) else ' '
                         
-                    line += f"{term.green}{ch}{term.normal}"
+                    line += f"{term.green}{BG_BLUE}{ch}{term.normal}"
             elif (x, y) in bubble_set:
                 # Fish trail / flap bubbles
-                line += f"{term.cyan}o{term.normal}"
+                line += f"{term.cyan}{BG_BLUE}o{term.normal}"
             elif (x, y) in jf_map:
                 # Decorative jellyfish (if any) — match hazard pink
                 line += f"{BRIGHT_PINK}{jf_map[(x, y)]}{RESET}"
             elif (x, y) in jf_bubble_map:
                 # Jellyfish thrust bubbles — dim cyan (same darkness as jellyfish, blue colour)
-                line += f"\033[2;36m{jf_bubble_map[(x, y)]}{RESET}"
+                line += f"\033[2;36;48;5;24m{jf_bubble_map[(x, y)]}{RESET}"
             elif (x, y) in ambient_map:
                 # Ambient decorative bubbles — background layer, lowest priority
-                line += f"{term.cyan}{ambient_map[(x, y)]}{term.normal}"
+                line += f"{term.cyan}{BG_BLUE}{ambient_map[(x, y)]}{term.normal}"
             else:
-                line += " "
+                line += f"{BG_BLUE} {term.normal}"
         output += line + "\n"
     print(output + term.hide_cursor, end="", flush=True)
 
