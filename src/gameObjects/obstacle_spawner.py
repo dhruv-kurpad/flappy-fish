@@ -150,6 +150,7 @@ class ObstacleSpawner:
 
         if (
             self._frame_counter % self._spawn_interval == 0
+            and self._group_count() < self._max_groups
         ):
             self._spawn()
 

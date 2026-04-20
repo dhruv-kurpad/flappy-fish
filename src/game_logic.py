@@ -162,7 +162,7 @@ def start_game_logic(username):
         obstacle_speed=1,
         gap_size=16,
         spawn_interval=80,
-        max_pairs=2,
+        max_pairs=1,
     )
 
     # Game State
