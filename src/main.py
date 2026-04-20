@@ -400,7 +400,7 @@ def _draw_menu(options, selected_idx=None, animate=False):
         else:
             mprint(f"  {C}{i + 1}.{RST} {label}")
 
-    mprint(f"  {DIM}{len(options) + 1}. Remove User (DEBUG){RST}")
+    #mprint(f"  {DIM}{len(options) + 1}. Remove User (DEBUG){RST}")
     mprint(f"{Y}{'═' * 32}{RST}")
 
 
