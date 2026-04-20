@@ -105,6 +105,9 @@ class JellyfishObstacle(Obstacle):
     """
 
     JUMP_SPRITE_FRAMES = 8
+    GRAVITY = 0.04 / 1.5
+    MAX_DRIFT = 0.30
+    THRUST_VY = -0.75
 
     def __init__(
         self,
@@ -125,6 +128,7 @@ class JellyfishObstacle(Obstacle):
         # Drive which frame is shown (same logic shape as decorative jellyfish)
         self._jump_timer = 0
         self._jump_cooldown = random.randint(15, 35)
+        self._vy = 0.0
 
     @property
     def sprite(self) -> Sprite:
@@ -132,18 +136,22 @@ class JellyfishObstacle(Obstacle):
             return self._sprite_jump
         return self._sprite_idle
 
-    def tick_animation(self) -> None:
-        """
-        Call once per frame after movement. Mirrors decorative behaviour:
-        show thrust sprite for JUMP_SPRITE_FRAMES ticks, then idle until cooldown elapses.
-        """
+    def update_swim(self) -> None:
+        """Apply legacy jellyfish vertical thrust/gravity movement once per frame."""
+        # Old game_logic order: first move by current vy, then update timers/forces.
+        self._y_float += self._vy
+
         if self._jump_timer > 0:
             self._jump_timer -= 1
         else:
+            self._vy = min(self._vy + self.GRAVITY, self.MAX_DRIFT)
             self._jump_cooldown -= 1
             if self._jump_cooldown <= 0:
                 self._jump_timer = self.JUMP_SPRITE_FRAMES
-                self._jump_cooldown = random.randint(15, 35)
+                self._vy = self.THRUST_VY
+                self._jump_cooldown = random.randint(30, 180)
+
+        self._position = (int(self._x_float), int(round(self._y_float)))
 
 
 class PufferfishObstacle(Obstacle):

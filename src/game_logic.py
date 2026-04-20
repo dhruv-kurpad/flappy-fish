@@ -43,11 +43,35 @@ def check_collision(player, obs):
     px, py = player.position
     ox, oy = obs.position
 
-    # Check if the player's bounding box overlaps with the obstacle's bounding box
+    # Fast bounding-box reject first.
     overlap_x = px < ox + obs.width and px + player.width > ox
     overlap_y = py < oy + obs.height and py + player.height > oy
+    if not (overlap_x and overlap_y):
+        return False
 
-    return overlap_x and overlap_y
+    # Pixel-accurate collision: only count if both sprites have non-space chars
+    # at the same world coordinate.
+    left = max(px, ox)
+    right = min(px + player.width, ox + obs.width)
+    top = max(py, oy)
+    bottom = min(py + player.height, oy + obs.height)
+
+    player_display = player.sprite.display
+    obs_display = obs.sprite.display
+
+    for world_y in range(top, bottom):
+        player_row = world_y - py
+        obs_row = world_y - oy
+        for world_x in range(left, right):
+            player_col = world_x - px
+            obs_col = world_x - ox
+            if (
+                player_display[player_row][player_col] != ' '
+                and obs_display[obs_row][obs_col] != ' '
+            ):
+                return True
+
+    return False
 
 def update_score(player, obstacle_pairs, passed_pairs, score):
     active_pairs = set()
@@ -99,13 +123,13 @@ def start_game_logic(username):
     obstacle_types = [
         ObstacleTypeConfig(
             name="static",
-            weight=0.10,
+            weight=0.2,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
         ),
         ObstacleTypeConfig(
             name="moving",
-            weight=0.10,
+            weight=0.1,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
             amplitude=5.0,
@@ -113,7 +137,7 @@ def start_game_logic(username):
         ),
         ObstacleTypeConfig(
             name="jellyfish",
-            weight=0.50,
+            weight=0.4,
             top_sprite=str(ASSETS / "jellyfish.txt"),
             bottom_sprite="",
             solo=True,
@@ -122,7 +146,7 @@ def start_game_logic(username):
         ),
         ObstacleTypeConfig(
             name="pufferfish",
-            weight=0.30,
+            weight=0.3,
             top_sprite=str(ASSETS / "pufferfish1.txt"),
             bottom_sprite="",
             solo=True,
@@ -310,12 +334,6 @@ def start_game_logic(username):
                 spawner.update_obstacle_speed(new_speed)
                 spawner.update_spawn_interval(new_interval)
                 just_increased_difficulty = True
-
-                if score % 10 == 0:
-                    for obs_type in spawner._types:
-                        if obs_type.name == "moving":
-                            new_weight = min(obs_type.weight + 0.2, 0.4)
-                            obs_type.update_weight(new_weight)
             elif score % 5 != 0:
                 just_increased_difficulty = False
 
@@ -392,6 +410,7 @@ def start_game_logic(username):
                     live_ambient.append(b)
             ambient_bubbles = live_ambient
 
+            """
             # 11. UPDATE DECORATIVE JELLYFISH
             _jf_spawn_timer += dt * FRAME_SCALE
             if _jf_spawn_timer >= _next_jf_spawn:
@@ -402,14 +421,15 @@ def start_game_logic(username):
                 # Start with vy = 0; gravity will slowly pull down until first thrust.
                 jellyfishes.append([float(term.width + 2), spawn_y, 0, 0,
                                     random.randint(15, 35), 0.0])
-
+            """
+                                    
             jf_speed = spawner._speed
             JF_GRAVITY   = gravity  # rows/frame^2 — 1.5× slower slide-down
             JF_MAX_DRIFT = 0.30   # cap downward drift speed
 
             live_jf = []
             for jf in jellyfishes:
-                jf[0] -= jf_speed * dt * FRAME_SCALE * 0.25   # scroll left at obstacle speed
+                jf[0] -= jf_speed    # scroll left at obstacle speed
                 jf[1] += jf[5] * dt * FRAME_SCALE * 0.25     # apply current vy
 
                 if jf[3] > 0:       # thrust animation in progress
