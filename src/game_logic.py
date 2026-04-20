@@ -9,6 +9,7 @@ from auth import get_leaderboard, update_score as persist_score
 from gameObjects.player import Player
 from gameObjects.obstacle_spawner import ObstacleSpawner, ObstacleTypeConfig
 from gameObjects.sprite import Sprite
+from gameObjects.coin import Coin
 from display import draw
 
 ASSETS = Path(__file__).resolve().parent / "assets"
@@ -233,6 +234,12 @@ def start_game_logic(username):
     _tentacle_frame = 0
     _tentacle_anim_timer = 0
 
+    # --- Coin system ---
+    # Each entry is a Coin instance; collected coins are removed each frame.
+    coins: list = []
+    _coin_spawn_timer = 0
+    _next_coin_spawn = random.randint(200, 360)   # frames until the first coin
+
     is_running = True
 
     with term.fullscreen(), term.cbreak(), term.hidden_cursor():
@@ -282,7 +289,7 @@ def start_game_logic(username):
             if key == ' ':
                 _play_sfx("bubble")
                 if current_time - last_flap_time > flap_cooldown:
-                    velocity = -10 * FRAME_SCALE * dt  # Convert to per-second units
+                    velocity = -10 * FRAME_SCALE * dt
                     last_flap_time = current_time
                 # Switch to jump sprite and reset the display timer
                 player.set_jumping(True)
@@ -491,7 +498,36 @@ def start_game_logic(username):
                 _tentacle_frame = 1 - _tentacle_frame
                 _tentacle_anim_timer = 0
 
-            # 12. RENDER
+            # 13. UPDATE COINS
+            _coin_spawn_timer += dt * FRAME_SCALE
+            if _coin_spawn_timer >= _next_coin_spawn:
+                _coin_spawn_timer = 0
+                _next_coin_spawn = random.randint(200, 360)
+                # Spawn at a random y that keeps the coin fully within the game area
+                tmp_coin = Coin(0.0, 0.0)
+                margin = 2
+                y_lo = HEADER_LINES + margin
+                y_hi = max(y_lo, game_height - tmp_coin.height - margin)
+                spawn_y = float(random.randint(y_lo, y_hi))
+                coins.append(Coin(float(term.width + 2), spawn_y))
+
+            live_coins = []
+            for coin in coins:
+                coin.scroll(spawner._speed)
+                cx, cy = coin.position
+                # Collision: bounding box overlap with player
+                px, py = player.position
+                overlap_x = px < cx + coin.width and px + player.width > cx
+                overlap_y = py < cy + coin.height and py + player.height > cy
+                if overlap_x and overlap_y:
+                    coin.collected = True
+                    score += 1
+                    _play_sfx("coin_recieved")
+                if not coin.collected and cx + coin.width > 0:
+                    live_coins.append(coin)
+            coins = live_coins
+
+            # 14. RENDER
             current_high_score = max(saved_high_score, score)
             draw(
                 player,
@@ -507,7 +543,8 @@ def start_game_logic(username):
                 jellyfishes=jellyfishes,
                 jf_sprites=jf_sprites,
                 jf_bubbles=jf_bubbles,
-                tentacle_frame=_tentacle_frame
+                tentacle_frame=_tentacle_frame,
+                coins=coins,
             )
             
 

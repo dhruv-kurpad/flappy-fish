@@ -17,7 +17,8 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
          bubbles: list = None, ambient_bubbles: list = None,
          crabs: list = None, crab_frames: list = None, crab_y: int = 0,
          jellyfishes: list = None, jf_sprites: list = None,
-         jf_bubbles: list = None, tentacle_frame: int = 0):
+         jf_bubbles: list = None, tentacle_frame: int = 0,
+         coins: list = None):
     output = term.home
     output += "\n"
 
@@ -72,6 +73,16 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
     if ambient_bubbles:
         for b in ambient_bubbles:
             ambient_map[(round(b[0]), round(b[1]))] = b[3]
+
+    # Coins: build (x, y) -> char map; spaces are transparent.
+    coin_map: dict = {}
+    if coins:
+        for coin in coins:
+            cx, cy = coin.position
+            for row_i, row in enumerate(coin.sprite.display):
+                for col_i, ch in enumerate(row):
+                    if ch != ' ':
+                        coin_map[(cx + col_i, cy + row_i)] = ch
 
     BG_BLUE = "\033[48;5;24m"
     # Jellyfish: bright pink (bold + 256-color) so it reads apart from yellow fish / green tentacles / red crab.
@@ -128,6 +139,10 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
                         ch = row[local_x] if local_x < len(row) else ' '
                         
                     line += f"{term.green}{BG_BLUE}{ch}{term.normal}"
+            elif (x, y) in coin_map:
+                # Collectible coin — rendered in bold gold (bright yellow + orange blend)
+                GOLD = "\033[1;38;5;220;48;5;24m"
+                line += f"{GOLD}{coin_map[(x, y)]}{RESET}"
             elif (x, y) in bubble_set:
                 # Fish trail / flap bubbles
                 line += f"{term.cyan}{BG_BLUE}o{term.normal}"
