@@ -459,7 +459,12 @@ def show_rules():
 
   {W}Scoring:{RST}
     +1 point for every pipe you pass through.
+    +1 point for every {Y}coin{RST} you collect.
     Your {Y}high score{RST} is saved automatically.
+
+  {W}Coins:{RST}
+    Gold {Y}[$]{RST} coins appear randomly in the water.
+    Swim through them to collect and earn points.
 
   {W}Tips:{RST}
     • Tap quickly for small hops.
