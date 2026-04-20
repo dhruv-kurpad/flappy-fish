@@ -123,7 +123,7 @@ def start_game_logic(username):
     obstacle_types = [
         ObstacleTypeConfig(
             name="static",
-            weight=0.2,
+            weight=0.6,
             top_sprite=str(ASSETS / "tentacles_top.txt"),
             bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
         ),
@@ -137,7 +137,7 @@ def start_game_logic(username):
         ),
         ObstacleTypeConfig(
             name="jellyfish",
-            weight=0.4,
+            weight=0.15,
             top_sprite=str(ASSETS / "jellyfish.txt"),
             bottom_sprite="",
             solo=True,
@@ -146,7 +146,7 @@ def start_game_logic(username):
         ),
         ObstacleTypeConfig(
             name="pufferfish",
-            weight=0.3,
+            weight=0.15,
             top_sprite=str(ASSETS / "pufferfish1.txt"),
             bottom_sprite="",
             solo=True,
@@ -326,6 +326,24 @@ def start_game_logic(username):
                     is_running = False
             # 6. UPDATE SCORE
             score = update_score(player, spawner._pairs, passed_pairs, score)
+
+            # Make harder obstacles
+            if score == 10:
+                for t in spawner._types:
+                    if t.name == "static":
+                        t.update_weight(0.60)
+                    elif t.name == "moving":
+                        t.update_weight(0.20)
+                    elif t.name == "jellyfish":
+                        t.update_weight(0.05)
+                    elif t.name == "pufferfish":
+                        t.update_weight(0.05)
+            elif score % 10 == 0 and score <= 100:
+                for t in spawner._types:
+                    if t.name == "static":
+                        t.update_weight(0.65 - (score * 0.005))
+                    elif t.name == "moving":
+                        t.update_weight(0.25 + (score * 0.005))
 
             # 7. CHECK DIFFICULTY INCREASE
             if score % 5 == 0 and score > 0 and not just_increased_difficulty:
