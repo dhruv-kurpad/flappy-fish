@@ -132,14 +132,14 @@ class ObstacleSpawner:
             solo.obs.set_x(new_x)
 
             amp = float(solo.amplitude)
-            if amp > 0.0:
+            if isinstance(solo.obs, JellyfishObstacle):
+                solo.obs.update_swim()
+            elif amp > 0.0:
                 solo.phase += float(solo.frequency)
                 delta = amp * math.sin(solo.phase)
                 solo.obs.apply_vertical_offset(delta)
 
-            if isinstance(solo.obs, JellyfishObstacle):
-                solo.obs.tick_animation()
-            elif isinstance(solo.obs, PufferfishObstacle) and player_x is not None:
+            if isinstance(solo.obs, PufferfishObstacle) and player_x is not None:
                 w = float(player_width) if player_width is not None else 0.0
                 solo.obs.update_inflation(player_x, w)
 
@@ -150,7 +150,6 @@ class ObstacleSpawner:
 
         if (
             self._frame_counter % self._spawn_interval == 0
-            and self._group_count() < self._max_groups
         ):
             self._spawn()
 
@@ -200,20 +199,50 @@ class ObstacleSpawner:
         if cfg.name == "pufferfish":
             self._spawn_pufferfish(cfg, spawn_x)
             return
+        if cfg.name == "jellyfish":
+            self._spawn_jellyfish(cfg, spawn_x)
+            return
 
-        tmp = JellyfishObstacle(spawn_x, 0.0, cfg.top_sprite)
+        tmp = Obstacle(spawn_x, 0.0, cfg.top_sprite)
         h = tmp.height
         margin = 1
         y_lo = margin
         y_hi = max(margin, self._game_height - h - margin)
         base_y = float(self._rng.randint(y_lo, y_hi)) if y_lo <= y_hi else float(margin)
 
-        obs = JellyfishObstacle(
+        obs = Obstacle(
             spawn_x,
             base_y,
             cfg.top_sprite,
             amplitude=0.0,
             frequency=0.0,
+        )
+
+        self._solo_list.append(
+            SpawnedSolo(
+                obs=obs,
+                amplitude=float(cfg.amplitude),
+                frequency=float(cfg.frequency),
+            )
+        )
+
+    def _spawn_jellyfish(self, cfg: ObstacleTypeConfig, spawn_x: float) -> None:
+        from pathlib import Path
+
+        assets = Path(__file__).resolve().parent.parent / "assets"
+        paths = [str(assets / "jellyfish.txt"), str(assets / "jellyfishJump.txt")]
+        max_h = max(len(Sprite(p).display) for p in paths)
+        margin = 1
+        y_lo = margin
+        y_hi = max(margin, self._game_height - max_h - margin)
+        base_y = float(self._rng.randint(y_lo, y_hi)) if y_lo <= y_hi else float(margin)
+
+        obs = JellyfishObstacle(
+            spawn_x,
+            base_y,
+            cfg.top_sprite,
+            amplitude=float(cfg.amplitude),
+            frequency=float(cfg.frequency),
         )
 
         self._solo_list.append(
