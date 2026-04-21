@@ -28,8 +28,8 @@ class _BGMPlayer:
     def play(self, name: str):
         if not _AUDIO_OK:
             return
-        path = str(_SOUNDS / f"{name}.wav")
-        if not Path(path).exists():
+        path = _find_sound(name)
+        if path is None:
             return
         if self._current == name:
             return
@@ -85,18 +85,27 @@ _ASSETS = Path(__file__).resolve().parent / "assets"
 _SOUNDS = _ASSETS / "sounds"
 
 
+def _find_sound(name: str) -> str | None:
+    """Return the path to name.mp3 or name.wav, whichever exists first."""
+    for ext in (".mp3", ".wav"):
+        p = _SOUNDS / f"{name}{ext}"
+        if p.exists():
+            return str(p)
+    return None
+
+
 _sfx_cache: dict = {}
 
 def _play_sfx(name: str):
-    """Play a WAV sound effect asynchronously via pygame.mixer (cross-platform)."""
+    """Play a sound effect asynchronously via pygame.mixer (cross-platform)."""
     if not _AUDIO_OK:
         return
-    path = _SOUNDS / f"{name}.wav"
-    if not path.exists():
+    path = _find_sound(name)
+    if path is None:
         return
     try:
         if name not in _sfx_cache:
-            _sfx_cache[name] = pygame.mixer.Sound(str(path))
+            _sfx_cache[name] = pygame.mixer.Sound(path)
         _sfx_cache[name].play()
     except Exception:
         pass
