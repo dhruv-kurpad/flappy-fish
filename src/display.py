@@ -97,8 +97,9 @@ def draw(player: Player, obstacles: List[Obstacle], score: int, high_score: int,
         for x in range(WIDTH):
             if (x >= round(player.position[0]) and x < round(player.position[0]) + player.width
                     and y >= round(player.position[1]) and y < round(player.position[1]) + player.height):
-                # Player sprite — highest priority
-                line += (f"{term.yellow}{BG_BLUE}"
+                # Player sprite — highest priority; red when dead
+                player_color = term.red if player.is_dead else term.yellow
+                line += (f"{player_color}{BG_BLUE}"
                          f"{player.sprite.display[y - round(player.position[1])][x - round(player.position[0])]}"
                          f"{term.normal}")
             elif (x, y) in crab_map:

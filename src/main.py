@@ -32,6 +32,10 @@ class _BGMPlayer:
                 )
                 stop.wait()
                 proc.terminate()
+                try:
+                    proc.wait(timeout=2.0)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
                 return
             else:
                 proc = subprocess.Popen(["aplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -121,10 +125,7 @@ def _play_sfx(name: str):
         ).start()
     elif sys.platform == "win32":
         import winsound
-        threading.Thread(
-            target=lambda: winsound.PlaySound(str(path), winsound.SND_FILENAME),
-            daemon=True,
-        ).start()
+        winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
     else:  # Linux
         cmd = ["aplay", str(path)]
         threading.Thread(

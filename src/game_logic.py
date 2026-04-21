@@ -25,10 +25,7 @@ def _play_sfx(name: str):
         cmd = ["afplay", str(path)]
     elif sys.platform == "win32":
         import winsound
-        threading.Thread(
-            target=lambda: winsound.PlaySound(str(path), winsound.SND_FILENAME),
-            daemon=True,
-        ).start()
+        winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
         return
     else:
         cmd = ["aplay", str(path)]
@@ -492,7 +489,7 @@ def start_game_logic(username):
                     live_jf_bub.append(b)
             jf_bubbles = live_jf_bub
 
-            # 12. UPDATE DECORATIVE CRABS
+            # 12. UPDATE CRABS (obstacle + animation)
             _crab_spawn_timer += dt * FRAME_SCALE
             if _crab_spawn_timer >= _next_crab_spawn:
                 _crab_spawn_timer = 0
@@ -509,6 +506,26 @@ def start_game_logic(username):
                     c[1] = 1 - c[1]      # toggle between frame 0 and 1
                 if c[0] > -crab_width:
                     live_crabs.append(c)
+
+                # Collision check: pixel-accurate, same logic as check_collision()
+                cx, cy = int(c[0]), crab_y
+                px, py = player.position
+                if (px < cx + crab_width and px + player.width > cx and
+                        py < cy + crab_height and py + player.height > cy):
+                    crab_display = crab_frames[c[1]]
+                    player_display = player.sprite.display
+                    left, right = max(px, cx), min(px + player.width, cx + crab_width)
+                    top, bottom = max(py, cy), min(py + player.height, cy + crab_height)
+                    for wy in range(top, bottom):
+                        for wx in range(left, right):
+                            if (player_display[wy - py][wx - px] != ' ' and
+                                    crab_display[wy - cy][wx - cx] != ' '):
+                                player.set_dead(True)
+                                is_running = False
+                                break
+                        if not is_running:
+                            break
+
             crabs = live_crabs
 
             _tentacle_anim_timer += dt
@@ -566,11 +583,38 @@ def start_game_logic(username):
             )
             
 
-        # Game Over Pause
+        # Death animation: fish jumps up then falls, rendered in red
+        _play_sfx("game_over")
+        player.set_dead(True)
+        _death_vy = -25.0
+        _death_y = float(player.position[1])
+        _death_elapsed = 0.0
+        _death_last = time.perf_counter()
+        _final_score = max(saved_high_score, score)
+
+        while _death_elapsed < 1.5:
+            _now = time.perf_counter()
+            _dt = min(_now - _death_last, 0.05)
+            _death_last = _now
+
+            _death_vy += gravity * _dt
+            _death_y += _death_vy * _dt
+            player._position = (player.position[0], int(_death_y))
+
+            draw(
+                player, spawner.obstacles, score=score,
+                high_score=_final_score, term=term,
+                bubbles=[], ambient_bubbles=[],
+                crabs=crabs, crab_frames=crab_frames, crab_y=crab_y,
+                tentacle_frame=_tentacle_frame, coins=[],
+            )
+            _death_elapsed += _dt
+            time.sleep(max(0.0, TARGET_FRAME_SECONDS - (time.perf_counter() - _now)))
+
         saved_high_score = sync_high_score(username, score, saved_high_score)
         game_over_text = " GAME OVER! "
         print(term.move_xy(term.width // 2 - len(game_over_text) // 2, term.height // 2) + term.red_on_black(game_over_text), end="", flush=True)
-        time.sleep(2)
+        time.sleep(1.5)
 
     print(term.clear + term.show_cursor, end="", flush=True)
     return score
