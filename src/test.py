@@ -465,41 +465,164 @@ class TestGameLogic(unittest.TestCase):
         result = game_logic.sync_high_score("alice", 15, 10)
         self.assertEqual(result, 10)
 
+    def test_update_score_does_not_increment_before_pass(self):
+        """Test score stays unchanged when obstacle has not been passed"""
+        player = Player(5, 5)
+        top = Obstacle(10, -5, str(_ASSETS / "tentacles_top.txt"))
+        bottom = Obstacle(10, 10, str(_ASSETS / "tentacles_bottom.txt"))
+        passed_pairs = set()
+
+        score = update_score(player, [(top, bottom)], passed_pairs, 3)
+
+        self.assertEqual(score, 3)
+        self.assertEqual(passed_pairs, set())
+
+    def test_update_score_cleans_stale_pairs(self):
+        """Test score tracking removes no-longer-active obstacle pairs"""
+        player = Player(20, 5)
+        top = Obstacle(0, -5, str(_ASSETS / "tentacles_top.txt"))
+        bottom = Obstacle(0, 10, str(_ASSETS / "tentacles_bottom.txt"))
+        passed_pairs = {id(top), 999999}
+
+        score = update_score(player, [(top, bottom)], passed_pairs, 0)
+
+        self.assertEqual(score, 0)
+        self.assertEqual(passed_pairs, {id(top)})
+
+    def test_check_collision_false_for_separated_bounding_boxes(self):
+        """Test collision rejects objects that do not overlap at all"""
+        player = self._make_actor(0, 0, [["A"]])
+        obstacle = self._make_actor(5, 5, [["B"]])
+        self.assertFalse(check_collision(player, obstacle))
+
 
 class TestAuth(unittest.TestCase):
     """Tests for authentication module"""
 
-    @mock.patch('auth.login_user')
-    def test_login_user_mocked(self, mock_login):
-        """Test login_user with mocked response"""
-        mock_login.return_value = {"code": 0, "success": True}
+    @mock.patch('auth.requests.get')
+    def test_login_user_success(self, mock_get):
+        """Test login_user returns backend JSON on success"""
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = {"code": 0, "username": "testuser"}
+        mock_get.return_value = response
+
         result = auth.login_user("testuser", "password123")
-        self.assertIsInstance(result, dict)
 
-    @mock.patch('auth.register_user')
-    def test_register_user_mocked(self, mock_register):
-        """Test register_user with mocked response"""
-        mock_register.return_value = {"code": 0, "success": True}
+        self.assertEqual(result["code"], 0)
+        mock_get.assert_called_once()
+
+    @mock.patch('auth.requests.get')
+    def test_login_user_invalid_json(self, mock_get):
+        """Test login_user handles invalid JSON responses"""
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.side_effect = ValueError()
+        mock_get.return_value = response
+
+        result = auth.login_user("testuser", "password123")
+
+        self.assertEqual(result["code"], -99)
+
+    @mock.patch('auth.requests.get')
+    def test_login_user_request_failure(self, mock_get):
+        """Test login_user returns error code on request failure"""
+        mock_get.side_effect = auth.requests.RequestException()
+
+        result = auth.login_user("testuser", "password123")
+
+        self.assertEqual(result, {"code": -99})
+
+    @mock.patch('auth.requests.get')
+    def test_register_user_success(self, mock_get):
+        """Test register_user returns backend code on success"""
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.text = "1"
+        mock_get.return_value = response
+
         result = auth.register_user("newuser", "password123")
-        self.assertIsInstance(result, dict)
 
-    @mock.patch('auth.remove_user')
-    def test_remove_user_mocked(self, mock_remove):
-        """Test remove_user with mocked response"""
-        mock_remove.return_value = {"code": 0, "success": True}
+        self.assertEqual(result, {"code": 1})
+        mock_get.assert_called_once()
+
+    @mock.patch('auth.requests.get')
+    def test_register_user_request_failure(self, mock_get):
+        """Test register_user returns error code on request failure"""
+        mock_get.side_effect = auth.requests.RequestException()
+
+        result = auth.register_user("newuser", "password123")
+
+        self.assertEqual(result, {"code": -99})
+
+    @mock.patch('auth.requests.get')
+    def test_remove_user_success(self, mock_get):
+        """Test remove_user returns backend code on success"""
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.text = "0"
+        mock_get.return_value = response
+
         result = auth.remove_user("user_to_remove")
-        self.assertIsInstance(result, dict)
 
-    @mock.patch('auth.get_leaderboard')
-    def test_get_leaderboard_mocked(self, mock_leaderboard):
-        """Test get_leaderboard with mocked response"""
-        mock_leaderboard.return_value = {
-            "success": True,
-            "players": [{"username": "alice", "highScore": 99}],
-        }
+        self.assertEqual(result, {"code": 0})
+
+    @mock.patch('auth.requests.get')
+    def test_get_leaderboard_request_failure(self, mock_get):
+        """Test get_leaderboard returns failure structure on request failure"""
+        mock_get.side_effect = auth.requests.RequestException()
+
         result = auth.get_leaderboard()
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["players"], [])
+
+    @mock.patch('auth.requests.get')
+    def test_get_leaderboard_success(self, mock_get):
+        """Test get_leaderboard wraps backend player list"""
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.return_value = [{"username": "alice", "highScore": 12}]
+        mock_get.return_value = response
+
+        result = auth.get_leaderboard()
+
         self.assertTrue(result["success"])
         self.assertEqual(result["players"][0]["username"], "alice")
+
+    @mock.patch('auth.requests.get')
+    def test_get_leaderboard_invalid_json(self, mock_get):
+        """Test get_leaderboard handles invalid JSON responses"""
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.json.side_effect = ValueError()
+        mock_get.return_value = response
+
+        result = auth.get_leaderboard()
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["players"], [])
+
+    @mock.patch('auth.requests.get')
+    def test_update_score_success(self, mock_get):
+        """Test update_score returns backend code on success"""
+        response = mock.Mock()
+        response.raise_for_status.return_value = None
+        response.text = "1"
+        mock_get.return_value = response
+
+        result = auth.update_score("alice", 99)
+
+        self.assertEqual(result, {"code": 1})
+
+    @mock.patch('auth.requests.get')
+    def test_update_score_request_failure(self, mock_get):
+        """Test update_score returns error code on request failure"""
+        mock_get.side_effect = auth.requests.RequestException()
+
+        result = auth.update_score("alice", 99)
+
+        self.assertEqual(result, {"code": -99})
 
 
 
