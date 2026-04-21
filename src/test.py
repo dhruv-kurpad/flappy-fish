@@ -1,6 +1,7 @@
 import unittest
 from unittest import mock
 import sys
+from types import SimpleNamespace
 
 from blessed import Terminal
 from pathlib import Path
@@ -10,7 +11,7 @@ from gameObjects.player import Player
 from gameObjects.sprite import Sprite
 from display import _ASSETS, draw
 from game_logic import update_score, check_collision, get_high_score
-from auth import login_user, register_user, remove_user, get_leaderboard
+import auth
 
 class TestFrontend(unittest.TestCase):
 
@@ -395,6 +396,76 @@ class TestFrontend(unittest.TestCase):
         self.assertIsInstance(score, int)
 
 
+class TestGameLogic(unittest.TestCase):
+    """Tests for game_logic.py helpers"""
+
+    def _make_actor(self, x, y, display):
+        return SimpleNamespace(
+            position=(x, y),
+            width=len(display[0]),
+            height=len(display),
+            sprite=SimpleNamespace(display=display),
+        )
+
+    def test_check_collision_ignores_space_only_overlap(self):
+        """Test collisions ignore overlapping spaces"""
+        player = self._make_actor(10, 10, [["A", " "], [" ", " "]])
+        obstacle = self._make_actor(10, 10, [[" ", "B"], [" ", " "]])
+        self.assertFalse(check_collision(player, obstacle))
+
+    def test_check_collision_detects_visible_overlap(self):
+        """Test collisions are detected when visible pixels overlap"""
+        player = self._make_actor(10, 10, [["A", " "], [" ", " "]])
+        obstacle = self._make_actor(10, 10, [["B", " "], [" ", " "]])
+        self.assertTrue(check_collision(player, obstacle))
+
+    @mock.patch('game_logic.get_leaderboard')
+    def test_get_high_score_found(self, mock_leaderboard):
+        """Test get_high_score returns the matching user's score"""
+        mock_leaderboard.return_value = {
+            "success": True,
+            "players": [
+                {"username": "alice", "highScore": 42},
+                {"username": "bob", "highScore": 7},
+            ],
+        }
+        self.assertEqual(get_high_score("alice"), 42)
+
+    @mock.patch('game_logic.get_leaderboard')
+    def test_get_high_score_missing_user(self, mock_leaderboard):
+        """Test get_high_score returns 0 when user is missing"""
+        mock_leaderboard.return_value = {
+            "success": True,
+            "players": [{"username": "bob", "highScore": 7}],
+        }
+        self.assertEqual(get_high_score("alice"), 0)
+
+    @mock.patch('game_logic.persist_score')
+    def test_sync_high_score_skips_when_not_beaten(self, mock_persist):
+        """Test sync_high_score keeps the saved score when not improved"""
+        import game_logic
+        result = game_logic.sync_high_score("alice", 5, 10)
+        self.assertEqual(result, 10)
+        mock_persist.assert_not_called()
+
+    @mock.patch('game_logic.persist_score')
+    def test_sync_high_score_updates_on_success(self, mock_persist):
+        """Test sync_high_score updates on backend success"""
+        import game_logic
+        mock_persist.return_value = {"code": 0}
+        result = game_logic.sync_high_score("alice", 15, 10)
+        self.assertEqual(result, 15)
+        mock_persist.assert_called_once_with("alice", 15)
+
+    @mock.patch('game_logic.persist_score')
+    def test_sync_high_score_keeps_saved_on_failure(self, mock_persist):
+        """Test sync_high_score keeps the saved score on backend failure"""
+        import game_logic
+        mock_persist.return_value = {"code": 500}
+        result = game_logic.sync_high_score("alice", 15, 10)
+        self.assertEqual(result, 10)
+
+
 class TestAuth(unittest.TestCase):
     """Tests for authentication module"""
 
@@ -402,27 +473,88 @@ class TestAuth(unittest.TestCase):
     def test_login_user_mocked(self, mock_login):
         """Test login_user with mocked response"""
         mock_login.return_value = {"code": 0, "success": True}
-        result = login_user("testuser", "password123")
+        result = auth.login_user("testuser", "password123")
         self.assertIsInstance(result, dict)
 
     @mock.patch('auth.register_user')
     def test_register_user_mocked(self, mock_register):
         """Test register_user with mocked response"""
         mock_register.return_value = {"code": 0, "success": True}
-        result = register_user("newuser", "password123")
+        result = auth.register_user("newuser", "password123")
         self.assertIsInstance(result, dict)
 
     @mock.patch('auth.remove_user')
     def test_remove_user_mocked(self, mock_remove):
         """Test remove_user with mocked response"""
         mock_remove.return_value = {"code": 0, "success": True}
-        result = remove_user("user_to_remove")
+        result = auth.remove_user("user_to_remove")
         self.assertIsInstance(result, dict)
+
+    @mock.patch('auth.get_leaderboard')
+    def test_get_leaderboard_mocked(self, mock_leaderboard):
+        """Test get_leaderboard with mocked response"""
+        mock_leaderboard.return_value = {
+            "success": True,
+            "players": [{"username": "alice", "highScore": 99}],
+        }
+        result = auth.get_leaderboard()
+        self.assertTrue(result["success"])
+        self.assertEqual(result["players"][0]["username"], "alice")
 
 
 
 class TestMain(unittest.TestCase):
     """Tests for main.py utility functions"""
+
+    @mock.patch('main._typewriter')
+    def test_validate_credentials_accepts_normal_input(self, mock_typewriter):
+        """Test validate_credentials accepts basic credentials"""
+        import main
+        self.assertTrue(main.validate_credentials("player1", "secret123"))
+        mock_typewriter.assert_not_called()
+
+    @mock.patch('main.pause_after_message')
+    @mock.patch('main._typewriter')
+    def test_validate_credentials_rejects_spaces(self, mock_typewriter, mock_pause):
+        """Test validate_credentials rejects usernames with spaces"""
+        import main
+        self.assertFalse(main.validate_credentials("bad user", "secret123"))
+        mock_typewriter.assert_called_once()
+        mock_pause.assert_called_once()
+
+    @mock.patch('main.pause_after_message')
+    @mock.patch('main._typewriter')
+    def test_validate_credentials_rejects_empty_password(self, mock_typewriter, mock_pause):
+        """Test validate_credentials rejects empty passwords"""
+        import main
+        self.assertFalse(main.validate_credentials("player1", ""))
+        mock_typewriter.assert_called_once()
+        mock_pause.assert_called_once()
+
+    @mock.patch('main._typewriter')
+    def test_handle_login_code_success(self, mock_typewriter):
+        """Test login code handler success path"""
+        import main
+        main.handle_login_code(0)
+        mock_typewriter.assert_called_once()
+
+    @mock.patch('main._typewriter')
+    def test_handle_register_code_taken(self, mock_typewriter):
+        """Test register code handler duplicate-user path"""
+        import main
+        main.handle_register_code(-1, "player1")
+        mock_typewriter.assert_called_once_with(
+            "Error: Username 'player1' is already taken.", color=main.R
+        )
+
+    @mock.patch('main._typewriter')
+    def test_handle_remove_code_success(self, mock_typewriter):
+        """Test remove code handler success path"""
+        import main
+        main.handle_remove_code(0, "player1")
+        mock_typewriter.assert_called_once_with(
+            "User 'player1' removed successfully.", color=main.G
+        )
 
     def test_pad_terminal_width(self):
         """Test terminal padding helper"""
@@ -470,6 +602,23 @@ class TestMain(unittest.TestCase):
         import main
         main._play_sfx("test_sound")
         self.assertEqual(mock_sfx.call_count, 1)
+
+    @mock.patch('main._play_sfx')
+    @mock.patch('builtins.input', return_value='choice')
+    def test_input_with_sfx_returns_value(self, mock_input, mock_sfx):
+        """Test _input_with_sfx returns the entered value"""
+        import main
+        self.assertEqual(main._input_with_sfx("Prompt: "), "choice")
+        mock_sfx.assert_called_once_with("button_click")
+
+    @mock.patch('main._animated_input', return_value='2')
+    @mock.patch('main._play_sfx')
+    def test_menu_input_calls_animated_input(self, mock_sfx, mock_animated):
+        """Test _menu_input wraps animated input"""
+        import main
+        self.assertEqual(main._menu_input(), '2')
+        mock_animated.assert_called_once()
+        mock_sfx.assert_called_once_with("button_click")
 
     @mock.patch('sys.stdout')
     def test_mprint_basic(self, mock_stdout):
@@ -578,6 +727,11 @@ class TestMain(unittest.TestCase):
         self.assertIsInstance(main.G, str)
         self.assertIsInstance(main.R, str)
         self.assertIsInstance(main.W, str)
+
+    def test_find_sound_missing_returns_none(self):
+        """Test _find_sound returns None for a missing sound"""
+        import main
+        self.assertIsNone(main._find_sound("definitely_missing_sound_file"))
 
 if __name__ == '__main__':
     unittest.main()
