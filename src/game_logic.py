@@ -5,6 +5,14 @@ import random
 import subprocess
 import threading
 from pathlib import Path
+
+try:
+    import pygame
+    if not pygame.mixer.get_init():
+        pygame.mixer.init()
+    _AUDIO_OK = True
+except Exception:
+    _AUDIO_OK = False
 from auth import get_leaderboard, update_score as persist_score
 from gameObjects.player import Player
 from gameObjects.obstacle_spawner import ObstacleSpawner, ObstacleTypeConfig
@@ -16,23 +24,21 @@ ASSETS = Path(__file__).resolve().parent / "assets"
 _SOUNDS = ASSETS / "sounds"
 
 
+_sfx_cache: dict = {}
+
 def _play_sfx(name: str):
-    """Play a short WAV sound effect asynchronously (fire-and-forget)."""
+    """Play a short WAV sound effect asynchronously via pygame.mixer (cross-platform)."""
+    if not _AUDIO_OK:
+        return
     path = _SOUNDS / f"{name}.wav"
     if not path.exists():
         return
-    if sys.platform == "darwin":
-        cmd = ["afplay", str(path)]
-    elif sys.platform == "win32":
-        import winsound
-        winsound.PlaySound(str(path), winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT)
-        return
-    else:
-        cmd = ["aplay", str(path)]
-    threading.Thread(
-        target=lambda: subprocess.run(cmd, capture_output=True),
-        daemon=True,
-    ).start()
+    try:
+        if name not in _sfx_cache:
+            _sfx_cache[name] = pygame.mixer.Sound(str(path))
+        _sfx_cache[name].play()
+    except Exception:
+        pass
 HEADER_LINES = 4  # number of lines the header occupies in display.py
 
 # --- COLLISION HELPER ---
