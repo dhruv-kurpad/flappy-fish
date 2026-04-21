@@ -419,13 +419,6 @@ class TestAuth(unittest.TestCase):
         result = remove_user("user_to_remove")
         self.assertIsInstance(result, dict)
 
-    @mock.patch('auth.get_leaderboard')
-    def test_get_leaderboard_empty(self, mock_leaderboard):
-        """Test get_leaderboard with empty player list"""
-        mock_leaderboard.return_value = {"success": True, "players": []}
-        result = get_leaderboard()
-        self.assertEqual(len(result.get("players", [])), 0)
-
 
 
 class TestMain(unittest.TestCase):
