@@ -495,6 +495,127 @@ class TestGameLogic(unittest.TestCase):
         obstacle = self._make_actor(5, 5, [["B"]])
         self.assertFalse(check_collision(player, obstacle))
 
+    def test_find_sound_missing_returns_none(self):
+        """Test _find_sound returns None for an unknown sound name"""
+        import game_logic
+        self.assertIsNone(game_logic._find_sound("does_not_exist"))
+
+    def test_play_sfx_no_audio_ok(self):
+        """Test _play_sfx is a no-op when audio is unavailable"""
+        import game_logic
+        with mock.patch.object(game_logic, "_AUDIO_OK", False):
+            game_logic._play_sfx("bubble")
+
+    @mock.patch('game_logic.get_high_score', return_value=0)
+    @mock.patch('game_logic.sync_high_score', return_value=0)
+    @mock.patch('game_logic.draw')
+    @mock.patch('game_logic.check_collision', return_value=False)
+    @mock.patch('game_logic.update_score', return_value=0)
+    @mock.patch('game_logic.ObstacleSpawner')
+    @mock.patch('game_logic.Player')
+    @mock.patch('game_logic.Terminal')
+    @mock.patch('game_logic.time.sleep', return_value=None)
+    @mock.patch('game_logic.time.time', return_value=100.0)
+    @mock.patch('game_logic.time.perf_counter')
+    def test_start_game_logic_smoke_exit_path(
+        self,
+        mock_perf_counter,
+        mock_time,
+        mock_sleep,
+        mock_terminal,
+        mock_player_cls,
+        mock_spawner_cls,
+        mock_update_score,
+        mock_collision,
+        mock_draw,
+        mock_sync,
+        mock_get_high_score,
+    ):
+        """Test start_game_logic runs through setup and exits cleanly"""
+        import game_logic
+
+        class FakeKey(str):
+            def __new__(cls, value, code=None):
+                obj = str.__new__(cls, value)
+                obj.code = code
+                return obj
+
+        class FakeTerminal:
+            width = 80
+            height = 24
+            KEY_ESCAPE = "ESC"
+            clear = ""
+            hide_cursor = ""
+            show_cursor = ""
+            black_on_cyan = staticmethod(lambda text: text)
+            red_on_black = staticmethod(lambda text: text)
+            move_xy = staticmethod(lambda x, y: "")
+
+            def fullscreen(self):
+                return self
+
+            def cbreak(self):
+                return self
+
+            def hidden_cursor(self):
+                return self
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def inkey(self, timeout=0):
+                self.calls += 1
+                if self.calls == 1:
+                    return ' '
+                if self.calls == 2:
+                    return FakeKey('', code=self.KEY_ESCAPE)
+                return ''
+
+            def __init__(self):
+                self.calls = 0
+
+        class FakeSpawner:
+            def __init__(self, *args, **kwargs):
+                self.obstacles = []
+                self._pairs = []
+                self._speed = 1.0
+                self._spawn_interval = 80
+                self._types = []
+
+            def update(self, *args, **kwargs):
+                return None
+
+            def update_obstacle_speed(self, value):
+                self._speed = value
+
+            def update_spawn_interval(self, value):
+                self._spawn_interval = value
+
+        fake_terminal = FakeTerminal()
+        mock_terminal.return_value = fake_terminal
+
+        real_player = Player(10, 5)
+        mock_player_cls.return_value = real_player
+        mock_spawner_cls.return_value = FakeSpawner()
+
+        tick = {"t": 0.0}
+
+        def _fake_perf_counter():
+            tick["t"] += 0.05
+            return tick["t"]
+
+        mock_perf_counter.side_effect = _fake_perf_counter
+
+        score = game_logic.start_game_logic("alice")
+
+        self.assertIsInstance(score, int)
+        mock_get_high_score.assert_called_once_with("alice")
+        mock_draw.assert_called()
+        mock_sync.assert_called_once()
+
 
 class TestAuth(unittest.TestCase):
     """Tests for authentication module"""
