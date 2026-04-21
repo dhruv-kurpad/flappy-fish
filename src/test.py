@@ -977,5 +977,138 @@ class TestMain(unittest.TestCase):
         import main
         self.assertIsNone(main._find_sound("definitely_missing_sound_file"))
 
+    @mock.patch('main.pause_after_message')
+    @mock.patch('main._typewriter')
+    def test_validate_credentials_rejects_empty_username(self, mock_typewriter, mock_pause):
+        """Test validate_credentials rejects empty usernames"""
+        import main
+        self.assertFalse(main.validate_credentials("   ", "secret123"))
+        mock_typewriter.assert_called_once_with("Error: Username cannot be empty.", color=main.R)
+        mock_pause.assert_called_once()
+
+    @mock.patch('main._typewriter')
+    def test_handle_register_code_empty_username(self, mock_typewriter):
+        """Test register handler branch for empty username"""
+        import main
+        main.handle_register_code(-2, "ignored")
+        mock_typewriter.assert_called_once_with("Error: Username cannot be empty.", color=main.R)
+
+    @mock.patch('main._typewriter')
+    def test_handle_login_code_not_found(self, mock_typewriter):
+        """Test login handler branch for missing username"""
+        import main
+        main.handle_login_code(-1)
+        mock_typewriter.assert_called_once_with("Error: Username not found.", color=main.R)
+
+    @mock.patch('main._typewriter')
+    def test_handle_remove_code_not_found(self, mock_typewriter):
+        """Test remove handler branch for missing user"""
+        import main
+        main.handle_remove_code(-1, "ghost")
+        mock_typewriter.assert_called_once_with("Error: No user with username 'ghost' found.", color=main.R)
+
+    @mock.patch('main._draw_menu')
+    @mock.patch('main._animated_input', return_value='x')
+    def test_show_menu_invalid_choice(self, mock_input, mock_draw):
+        """Test show_menu returns invalid for non-digit input"""
+        import main
+        with mock.patch.object(main, 'current_user', None):
+            self.assertEqual(main.show_menu(), "invalid")
+
+    @mock.patch('main.time.sleep', return_value=None)
+    @mock.patch('main._draw_menu')
+    @mock.patch('main._play_sfx')
+    @mock.patch('main._animated_input', return_value='1')
+    def test_show_menu_logged_out_selects_login(self, mock_input, mock_sfx, mock_draw, mock_sleep):
+        """Test show_menu action map when logged out"""
+        import main
+        with mock.patch.object(main, 'current_user', None):
+            self.assertEqual(main.show_menu(), "login")
+
+    @mock.patch('main.time.sleep', return_value=None)
+    @mock.patch('main._draw_menu')
+    @mock.patch('main._play_sfx')
+    @mock.patch('main._animated_input', return_value='1')
+    def test_show_menu_logged_in_selects_start(self, mock_input, mock_sfx, mock_draw, mock_sleep):
+        """Test show_menu action map when logged in"""
+        import main
+        with mock.patch.object(main, 'current_user', 'alice'):
+            self.assertEqual(main.show_menu(), "start")
+
+    @mock.patch('main._menu_input', return_value='2')
+    @mock.patch('main._typewrite_option')
+    @mock.patch('main.mprint')
+    @mock.patch('main.clear_screen')
+    def test_show_rules_back_to_menu(self, mock_clear, mock_mprint, mock_opt, mock_menu_input):
+        """Test rules screen returns False when user does not start"""
+        import main
+        self.assertFalse(main.show_rules())
+
+    @mock.patch('main._menu_input', return_value='1')
+    @mock.patch('main._typewrite_option')
+    @mock.patch('main.mprint')
+    @mock.patch('main.clear_screen')
+    def test_show_rules_start_game(self, mock_clear, mock_mprint, mock_opt, mock_menu_input):
+        """Test rules screen returns True when starting game"""
+        import main
+        self.assertTrue(main.show_rules())
+
+    @mock.patch('main._typewriter')
+    @mock.patch('main.clear_screen')
+    @mock.patch('main._input_with_sfx', return_value='')
+    def test_search_player_empty_input(self, mock_input_sfx, mock_clear, mock_typewriter):
+        """Test leaderboard search rejects empty username"""
+        import main
+        self.assertFalse(main._search_player([]))
+        mock_typewriter.assert_called_once()
+
+    @mock.patch('main._typewriter')
+    @mock.patch('main.clear_screen')
+    @mock.patch('main._input_with_sfx', return_value='nobody')
+    def test_search_player_not_found(self, mock_input_sfx, mock_clear, mock_typewriter):
+        """Test leaderboard search handles missing player"""
+        import main
+        players = [{"username": "alice", "highScore": 10}]
+        self.assertFalse(main._search_player(players))
+        mock_typewriter.assert_called_once()
+
+    @mock.patch('main.mprint')
+    @mock.patch('main.clear_screen')
+    @mock.patch('main._input_with_sfx', return_value='alice')
+    def test_search_player_found(self, mock_input_sfx, mock_clear, mock_mprint):
+        """Test leaderboard search returns True for existing player"""
+        import main
+        players = [
+            {"username": "bob", "highScore": 8},
+            {"username": "alice", "highScore": 10},
+            {"username": "carol", "highScore": 7},
+        ]
+        self.assertTrue(main._search_player(players))
+
+    @mock.patch('main.pause_after_message')
+    @mock.patch('main.mprint')
+    @mock.patch('main.get_leaderboard', return_value={"success": False, "message": "down", "players": []})
+    @mock.patch('main.clear_screen')
+    def test_display_leaderboard_error_result(self, mock_clear, mock_get, mock_mprint, mock_pause):
+        """Test leaderboard screen handles backend failure response"""
+        import main
+        main.display_leaderboard()
+        mock_pause.assert_called_once()
+
+    @mock.patch('main.clear_screen')
+    @mock.patch('main._typewrite_option')
+    @mock.patch('main._print_leaderboard_page')
+    @mock.patch('main._menu_input', return_value='3')
+    @mock.patch('main.get_leaderboard', return_value={
+        "success": True,
+        "message": "ok",
+        "players": [{"username": "alice", "highScore": 10}]
+    })
+    def test_display_leaderboard_back_action(self, mock_get, mock_menu_input, mock_print_page, mock_opt, mock_clear):
+        """Test leaderboard loop exits on back action"""
+        import main
+        main.display_leaderboard()
+        mock_print_page.assert_called_once()
+
 if __name__ == '__main__':
     unittest.main()
