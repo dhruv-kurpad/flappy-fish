@@ -23,7 +23,7 @@ class _BGMPlayer:
     """Loops a WAV file via pygame.mixer.music (cross-platform)."""
 
     def __init__(self):
-        self._current: str | None = None
+        self._current = None  # type: Optional[str]
 
     def play(self, name: str):
         if not _AUDIO_OK:
@@ -85,7 +85,7 @@ _ASSETS = Path(__file__).resolve().parent / "assets"
 _SOUNDS = _ASSETS / "sounds"
 
 
-def _find_sound(name: str) -> str | None:
+def _find_sound(name: str) -> "Optional[str]":
     """Return the path to name.mp3 or name.wav, whichever exists first."""
     for ext in (".mp3", ".wav"):
         p = _SOUNDS / f"{name}{ext}"

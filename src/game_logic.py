@@ -24,7 +24,7 @@ ASSETS = Path(__file__).resolve().parent / "assets"
 _SOUNDS = ASSETS / "sounds"
 
 
-def _find_sound(name: str) -> str | None:
+def _find_sound(name: str) -> "Optional[str]":
     """Return the path to name.mp3 or name.wav, whichever exists first."""
     for ext in (".mp3", ".wav"):
         p = _SOUNDS / f"{name}{ext}"
