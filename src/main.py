@@ -5,6 +5,13 @@ import random
 import subprocess
 import threading
 from pathlib import Path
+
+try:
+    import pygame
+    pygame.mixer.init()
+    _AUDIO_OK = True
+except Exception:
+    _AUDIO_OK = False
 from auth import login_user, register_user, remove_user, get_leaderboard
 from game_logic import start_game_logic
 from colorama import init, Fore, Style
@@ -13,59 +20,30 @@ init(autoreset=False)
 
 # ── BGM player ────────────────────────────────────────────────────────────────
 class _BGMPlayer:
-    """Loops a WAV file in a background thread. Call switch() to cross-fade tracks."""
+    """Loops a WAV file via pygame.mixer.music (cross-platform)."""
 
     def __init__(self):
-        self._stop_event = threading.Event()
-        self._thread: threading.Thread | None = None
-        self._current: str | None = None
-
-    def _loop(self, path: str, stop: threading.Event):
-        while not stop.is_set():
-            if sys.platform == "darwin":
-                proc = subprocess.Popen(["afplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            elif sys.platform == "win32":
-                # winsound.PlaySound blocks; use a subprocess for looping on Windows
-                proc = subprocess.Popen(
-                    ["powershell", "-c", f"(New-Object Media.SoundPlayer '{path}').PlayLooping(); Start-Sleep 9999"],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                )
-                stop.wait()
-                proc.terminate()
-                return
-            else:
-                proc = subprocess.Popen(["aplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            # Wait for afplay/aplay to finish OR for stop signal
-            while proc.poll() is None:
-                if stop.is_set():
-                    proc.terminate()
-                    return
-                time.sleep(0.05)
+        self._current = None  # type: Optional[str]
 
     def play(self, name: str):
-        """Start playing a BGM track by name (no extension). No-op if already playing."""
-        path = str(_SOUNDS / f"{name}.wav")
-        if not Path(path).exists():
+        if not _AUDIO_OK:
             return
-        if self._current == name and self._thread and self._thread.is_alive():
+        path = _find_sound(name)
+        if path is None:
             return
-        self.stop()
+        if self._current == name:
+            return
+        pygame.mixer.music.load(path)
+        pygame.mixer.music.play(-1)  # -1 = loop forever
         self._current = name
-        self._stop_event = threading.Event()
-        self._thread = threading.Thread(
-            target=self._loop, args=(path, self._stop_event), daemon=True
-        )
-        self._thread.start()
 
     def stop(self):
-        if self._thread and self._thread.is_alive():
-            self._stop_event.set()
-            self._thread.join(timeout=1.0)
+        if not _AUDIO_OK:
+            return
+        pygame.mixer.music.stop()
         self._current = None
 
     def switch(self, name: str):
-        """Stop current BGM and start a new one."""
         if self._current != name:
             self.stop()
             self.play(name)
@@ -107,30 +85,30 @@ _ASSETS = Path(__file__).resolve().parent / "assets"
 _SOUNDS = _ASSETS / "sounds"
 
 
-def _play_sfx(name: str):
-    """Play a WAV sound file asynchronously. Works on macOS, Windows, and Linux."""
-    path = _SOUNDS / f"{name}.wav"
-    if not path.exists():
-        return
+def _find_sound(name: str) -> "Optional[str]":
+    """Return the path to name.mp3 or name.wav, whichever exists first."""
+    for ext in (".mp3", ".wav"):
+        p = _SOUNDS / f"{name}{ext}"
+        if p.exists():
+            return str(p)
+    return None
 
-    if sys.platform == "darwin":
-        cmd = ["afplay", str(path)]
-        threading.Thread(
-            target=lambda: subprocess.run(cmd, capture_output=True),
-            daemon=True,
-        ).start()
-    elif sys.platform == "win32":
-        import winsound
-        threading.Thread(
-            target=lambda: winsound.PlaySound(str(path), winsound.SND_FILENAME),
-            daemon=True,
-        ).start()
-    else:  # Linux
-        cmd = ["aplay", str(path)]
-        threading.Thread(
-            target=lambda: subprocess.run(cmd, capture_output=True),
-            daemon=True,
-        ).start()
+
+_sfx_cache: dict = {}
+
+def _play_sfx(name: str):
+    """Play a sound effect asynchronously via pygame.mixer (cross-platform)."""
+    if not _AUDIO_OK:
+        return
+    path = _find_sound(name)
+    if path is None:
+        return
+    try:
+        if name not in _sfx_cache:
+            _sfx_cache[name] = pygame.mixer.Sound(path)
+        _sfx_cache[name].play()
+    except Exception:
+        pass
 
 
 def _flush_stdin():

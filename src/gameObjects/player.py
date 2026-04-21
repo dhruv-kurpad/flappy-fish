@@ -32,6 +32,10 @@ class Player(GameObject):
         """Switch between the jump sprite and the normal idle sprite."""
         self._sprite = self._dead_sprite if dead else self._normal_sprite
 
+    @property
+    def is_dead(self) -> bool:
+        return self._sprite is self._dead_sprite
+
     def update(self) -> None:
         pass
         
