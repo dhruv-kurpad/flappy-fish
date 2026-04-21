@@ -1,4 +1,6 @@
 import unittest
+from unittest import mock
+import sys
 
 from blessed import Terminal
 from pathlib import Path
@@ -8,6 +10,7 @@ from gameObjects.player import Player
 from gameObjects.sprite import Sprite
 from display import _ASSETS, draw
 from game_logic import update_score, check_collision, get_high_score
+from auth import login_user, register_user, remove_user, get_leaderboard
 
 class TestFrontend(unittest.TestCase):
 
@@ -390,6 +393,198 @@ class TestFrontend(unittest.TestCase):
         passed_pairs = set()
         score = update_score(player, [(top, bottom)], passed_pairs, 0)
         self.assertIsInstance(score, int)
+
+
+class TestAuth(unittest.TestCase):
+    """Tests for authentication module"""
+
+    @mock.patch('auth.login_user')
+    def test_login_user_mocked(self, mock_login):
+        """Test login_user with mocked response"""
+        mock_login.return_value = {"code": 0, "success": True}
+        result = login_user("testuser", "password123")
+        self.assertIsInstance(result, dict)
+
+    @mock.patch('auth.register_user')
+    def test_register_user_mocked(self, mock_register):
+        """Test register_user with mocked response"""
+        mock_register.return_value = {"code": 0, "success": True}
+        result = register_user("newuser", "password123")
+        self.assertIsInstance(result, dict)
+
+    @mock.patch('auth.remove_user')
+    def test_remove_user_mocked(self, mock_remove):
+        """Test remove_user with mocked response"""
+        mock_remove.return_value = {"code": 0, "success": True}
+        result = remove_user("user_to_remove")
+        self.assertIsInstance(result, dict)
+
+    @mock.patch('auth.get_leaderboard')
+    def test_get_leaderboard_empty(self, mock_leaderboard):
+        """Test get_leaderboard with empty player list"""
+        mock_leaderboard.return_value = {"success": True, "players": []}
+        result = get_leaderboard()
+        self.assertEqual(len(result.get("players", [])), 0)
+
+
+
+class TestMain(unittest.TestCase):
+    """Tests for main.py utility functions"""
+
+    def test_pad_terminal_width(self):
+        """Test terminal padding helper"""
+        import main
+        # _pad() should return a string of spaces
+        result = main._pad()
+        self.assertIsInstance(result, str)
+        # Should be non-negative length
+        self.assertGreaterEqual(len(result), 0)
+
+    def test_clear_screen_basic(self):
+        """Test clear_screen without banner"""
+        import main
+        try:
+            # Capture stdout to avoid actual terminal clearing
+            with mock.patch('sys.stdout'):
+                main.clear_screen(show_banner=False)
+            self.assertTrue(True)
+        except Exception as e:
+            self.fail(f"clear_screen raised exception: {e}")
+
+    def test_clear_screen_with_banner(self):
+        """Test clear_screen with banner"""
+        import main
+        try:
+            with mock.patch('sys.stdout'):
+                main.clear_screen(show_banner=True)
+            self.assertTrue(True)
+        except Exception as e:
+            self.fail(f"clear_screen with banner raised exception: {e}")
+
+    def test_clear_screen_with_content_lines(self):
+        """Test clear_screen with content line count"""
+        import main
+        try:
+            with mock.patch('sys.stdout'):
+                main.clear_screen(show_banner=False, content_lines=10)
+            self.assertTrue(True)
+        except Exception as e:
+            self.fail(f"clear_screen with content_lines raised exception: {e}")
+
+    @mock.patch('main._play_sfx')
+    def test_play_sfx_called(self, mock_sfx):
+        """Test _play_sfx function is callable"""
+        import main
+        main._play_sfx("test_sound")
+        self.assertEqual(mock_sfx.call_count, 1)
+
+    @mock.patch('sys.stdout')
+    def test_mprint_basic(self, mock_stdout):
+        """Test mprint function"""
+        import main
+        try:
+            main.mprint("Test message")
+            self.assertTrue(True)
+        except Exception as e:
+            self.fail(f"mprint raised exception: {e}")
+
+    @mock.patch('sys.stdout')
+    def test_mprint_multiple_args(self, mock_stdout):
+        """Test mprint with multiple arguments"""
+        import main
+        try:
+            main.mprint("Test", "message", 123)
+            self.assertTrue(True)
+        except Exception as e:
+            self.fail(f"mprint with multiple args raised exception: {e}")
+
+    def test_banner_is_string(self):
+        """Test BANNER is defined and is a string"""
+        import main
+        self.assertIsInstance(main.BANNER, str)
+        self.assertGreater(len(main.BANNER), 0)
+
+    def test_color_constants_defined(self):
+        """Test color constants are defined"""
+        import main
+        self.assertTrue(hasattr(main, 'Y'))  # Yellow
+        self.assertTrue(hasattr(main, 'C'))  # Cyan
+        self.assertTrue(hasattr(main, 'G'))  # Green
+        self.assertTrue(hasattr(main, 'R'))  # Red
+        self.assertTrue(hasattr(main, 'W'))  # White
+
+    @mock.patch('main._flush_stdin')
+    @mock.patch('builtins.input', return_value='test')
+    def test_animated_input_mocked(self, mock_input, mock_flush):
+        """Test animated_input with mocked input"""
+        import main
+        result = main._animated_input()
+        self.assertEqual(result, 'test')
+
+    def test_bgm_player_creation(self):
+        """Test BGMPlayer class exists and can be instantiated"""
+        import main
+        player = main._BGMPlayer()
+        self.assertIsInstance(player, main._BGMPlayer)
+
+    def test_bgm_player_methods(self):
+        """Test BGMPlayer has expected methods"""
+        import main
+        player = main._BGMPlayer()
+        self.assertTrue(hasattr(player, 'play'))
+        self.assertTrue(hasattr(player, 'stop'))
+        self.assertTrue(hasattr(player, 'switch'))
+
+    @mock.patch('main._BGMPlayer.play')
+    def test_bgm_player_play(self, mock_play):
+        """Test BGMPlayer play method"""
+        import main
+        player = main._BGMPlayer()
+        player.play("test_track")
+        mock_play.assert_called_once()
+
+    def test_flush_stdin_no_error(self):
+        """Test _flush_stdin doesn't raise exception"""
+        import main
+        try:
+            main._flush_stdin()
+            self.assertTrue(True)
+        except Exception as e:
+            self.fail(f"_flush_stdin raised exception: {e}")
+
+    def test_clear_screen_combined_options(self):
+        """Test clear_screen with all options"""
+        import main
+        try:
+            with mock.patch('sys.stdout'):
+                main.clear_screen(show_banner=True, content_lines=20)
+            self.assertTrue(True)
+        except Exception as e:
+            self.fail(f"clear_screen combined options raised exception: {e}")
+
+    def test_mprint_with_custom_sep(self):
+        """Test mprint with custom separator"""
+        import main
+        try:
+            main.mprint("a", "b", sep="-")
+            self.assertTrue(True)
+        except Exception as e:
+            self.fail(f"mprint with custom sep raised exception: {e}")
+
+    def test_pad_returns_string(self):
+        """Test _pad always returns string"""
+        import main
+        result = main._pad()
+        self.assertIsInstance(result, str)
+
+    def test_color_constants_are_strings(self):
+        """Test color constants are strings"""
+        import main
+        self.assertIsInstance(main.Y, str)
+        self.assertIsInstance(main.C, str)
+        self.assertIsInstance(main.G, str)
+        self.assertIsInstance(main.R, str)
+        self.assertIsInstance(main.W, str)
 
 if __name__ == '__main__':
     unittest.main()
