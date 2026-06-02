@@ -1,0 +1,3 @@
+/* Reset — all game styling lives in App.css */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }

@@ -633,3 +633,361 @@ def start_game_logic(username):
 
     print(term.clear + term.show_cursor, end="", flush=True)
     return score
+
+
+# ---------------------------------------------------------------------------
+# Headless game loop — used by the web WebSocket server
+# ---------------------------------------------------------------------------
+
+def run_game_headless(input_queue, frame_callback, username: str, stop_event):
+    """
+    Run the game in a background thread for the web frontend.
+
+    input_queue  – threading.Queue; receives {"type": "flap"/"quit"} dicts
+    frame_callback – callable(dict); called with each rendered frame
+    stop_event   – threading.Event; set externally to abort the loop
+    """
+    import queue as _queue
+    from display_buffer import (
+        render_frame, BUFFER_COLS, GAME_AREA_HEIGHT, HEADER_ROWS,
+    )
+
+    TARGET_FPS = 30
+    TARGET_FRAME_SECONDS = 1.0 / TARGET_FPS
+
+    saved_high_score = get_high_score(username)
+
+    player = Player(BUFFER_COLS // 2 - 7, GAME_AREA_HEIGHT // 2)
+    player.set_dead(False)
+
+    obstacle_types = [
+        ObstacleTypeConfig(
+            name="static", weight=0.6,
+            top_sprite=str(ASSETS / "tentacles_top.txt"),
+            bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
+        ),
+        ObstacleTypeConfig(
+            name="moving", weight=0.1,
+            top_sprite=str(ASSETS / "tentacles_top.txt"),
+            bottom_sprite=str(ASSETS / "tentacles_bottom.txt"),
+            amplitude=5.0, frequency=0.065,
+        ),
+        ObstacleTypeConfig(
+            name="jellyfish", weight=0.15,
+            top_sprite=str(ASSETS / "jellyfish.txt"),
+            bottom_sprite="", solo=True, amplitude=5.0, frequency=0.065,
+        ),
+        ObstacleTypeConfig(
+            name="pufferfish", weight=0.15,
+            top_sprite=str(ASSETS / "pufferfish1.txt"),
+            bottom_sprite="", solo=True, amplitude=0.0, frequency=0.0,
+        ),
+    ]
+
+    spawner = ObstacleSpawner(
+        screen_width=BUFFER_COLS,
+        game_height=GAME_AREA_HEIGHT,
+        obstacle_types=obstacle_types,
+        obstacle_speed=1,
+        gap_size=16,
+        spawn_interval=80,
+        max_pairs=1,
+    )
+
+    bird_y_float = float(player.position[1])
+    FRAME_SCALE = 60.0
+    gravity = 0.75 * FRAME_SCALE
+    velocity = 0.0
+
+    last_frame_time = time.perf_counter()
+    last_flap_time = 0.0
+    flap_cooldown = 0.05
+    JUMP_SPRITE_FRAMES = 0.5
+    _jump_sprite_timer = 0
+
+    bubbles: list = []
+    _bubble_frame = 0
+    ambient_bubbles: list = []
+    _ambient_frame = 0
+    _next_ambient_spawn = random.randint(40, 80)
+
+    jf_sprites = [
+        Sprite(str(ASSETS / "jellyfish.txt")).display,
+        Sprite(str(ASSETS / "jellyfishJump.txt")).display,
+    ]
+    jf_idle_h = len(jf_sprites[0])
+    jf_idle_w = len(jf_sprites[0][0])
+    jellyfishes: list = []
+    jf_bubbles: list = []
+
+    crab_frames = [
+        Sprite(str(ASSETS / "crabAnim_01.txt")).display,
+        Sprite(str(ASSETS / "crabAnim_02.txt")).display,
+    ]
+    crab_height = len(crab_frames[0])
+    crab_width = len(crab_frames[0][0])
+    crab_y = GAME_AREA_HEIGHT - crab_height
+    crabs: list = []
+    _crab_spawn_timer = 0
+    _next_crab_spawn = random.randint(10, 12) * FRAME_SCALE
+
+    _tentacle_frame = 0
+    _tentacle_anim_timer = 0
+
+    coins: list = []
+    _coin_spawn_timer = 0
+    _next_coin_spawn = random.randint(200, 360)
+
+    def _make_frame(state: str, score_val: int, hs_val: int) -> dict:
+        fd = render_frame(
+            player, spawner.obstacles,
+            score=score_val, high_score=hs_val,
+            bubbles=bubbles, ambient_bubbles=ambient_bubbles,
+            crabs=crabs, crab_frames=crab_frames, crab_y=crab_y,
+            jellyfishes=jellyfishes, jf_sprites=jf_sprites,
+            jf_bubbles=jf_bubbles, tentacle_frame=_tentacle_frame,
+            coins=coins,
+        )
+        return {"type": "frame", "state": state, **fd}
+
+    # Pre-game: wait for first space
+    frame_callback(_make_frame("waiting", 0, saved_high_score))
+    waiting = True
+    while waiting and not stop_event.is_set():
+        try:
+            msg = input_queue.get(timeout=0.1)
+            if msg.get("type") == "flap":
+                velocity = -2.5
+                last_flap_time = time.time()
+                waiting = False
+            elif msg.get("type") == "quit":
+                return 0
+        except _queue.Empty:
+            pass
+
+    score = 0
+    passed_pairs: set = set()
+    just_increased_difficulty = False
+    is_running = True
+
+    while is_running and not stop_event.is_set():
+        current_frame_time = time.perf_counter()
+        dt = current_frame_time - last_frame_time
+        last_frame_time = current_frame_time
+        dt = min(dt, 0.05)
+
+        # Physics
+        velocity += gravity * dt
+        bird_y_float += velocity * dt
+
+        # Input
+        current_time = time.time()
+        try:
+            msg = input_queue.get_nowait()
+            mtype = msg.get("type", "")
+            if mtype == "flap":
+                if current_time - last_flap_time > flap_cooldown:
+                    velocity = -10.0
+                    last_flap_time = current_time
+                player.set_jumping(True)
+                _jump_sprite_timer = JUMP_SPRITE_FRAMES * FRAME_SCALE
+                for _ in range(5):
+                    bx = float(player.position[0]) + random.randint(-1, player.width // 2)
+                    by = float(player.position[1]) + random.randint(0, player.height - 1)
+                    vy = random.uniform(0.5, 0.9)
+                    bubbles.append([bx, by, vy, 80])
+            elif mtype == "quit":
+                is_running = False
+        except _queue.Empty:
+            pass
+
+        # Boundary checks
+        if bird_y_float >= GAME_AREA_HEIGHT - player.height:
+            bird_y_float = float(GAME_AREA_HEIGHT - player.height)
+            is_running = False
+        if bird_y_float < 1:
+            bird_y_float = 1.0
+            velocity = 0
+
+        player._position = (player.position[0], int(bird_y_float))
+
+        # Obstacles + collision
+        spawner.update(player.position[0], player.width)
+        for obs in spawner.obstacles:
+            if check_collision(player, obs):
+                player.set_dead(True)
+                is_running = False
+
+        # Score
+        score = update_score(player, spawner._pairs, passed_pairs, score)
+
+        # Difficulty
+        if score == 10:
+            for t in spawner._types:
+                if t.name == "static":    t.update_weight(0.60)
+                elif t.name == "moving":  t.update_weight(0.20)
+                elif t.name == "jellyfish": t.update_weight(0.05)
+                elif t.name == "pufferfish": t.update_weight(0.05)
+        elif score % 10 == 0 and score <= 100:
+            for t in spawner._types:
+                if t.name == "static":   t.update_weight(0.65 - (score * 0.005))
+                elif t.name == "moving": t.update_weight(0.25 + (score * 0.005))
+
+        if score % 5 == 0 and score > 0 and not just_increased_difficulty:
+            spawner.update_obstacle_speed(spawner._speed + 0.2)
+            spawner.update_spawn_interval(max(0, spawner._spawn_interval - 10))
+            just_increased_difficulty = True
+        elif score % 5 != 0:
+            just_increased_difficulty = False
+
+        # Jump sprite timer
+        if _jump_sprite_timer > 0:
+            _jump_sprite_timer -= dt * FRAME_SCALE
+            if _jump_sprite_timer <= 0:
+                player.set_jumping(False)
+
+        # Fish bubble trail
+        _bubble_frame += dt * FRAME_SCALE
+        while _bubble_frame >= FRAME_SCALE:
+            _bubble_frame -= FRAME_SCALE
+            bx = float(player.position[0]) + random.randint(-1, 0)
+            by = float(player.position[1]) + random.randint(0, player.height - 1)
+            bubbles.append([bx, by, 0.3, 100])
+
+        speed = spawner._speed
+        live = []
+        for b in bubbles:
+            b[0] -= speed * dt * FRAME_SCALE * 0.25
+            b[1] -= b[2] * dt * FRAME_SCALE * 0.25
+            b[3] -= dt * FRAME_SCALE
+            if b[3] > 0 and b[1] > 0:
+                live.append(b)
+        bubbles = live
+
+        # Ambient bubbles
+        _ambient_frame += dt * FRAME_SCALE
+        if _ambient_frame >= _next_ambient_spawn:
+            _ambient_frame = 0
+            _next_ambient_spawn = random.randint(40, 80)
+            base_x = float(BUFFER_COLS + 2)
+            base_y = float(random.randint(int(GAME_AREA_HEIGHT * 0.50), int(GAME_AREA_HEIGHT * 0.88)))
+            for _ in range(random.randint(1, 2)):
+                ambient_bubbles.append([base_x + random.uniform(-1.0, 1.0), base_y + random.uniform(-1.0, 1.0), random.uniform(0.15, 0.25), "O"])
+            for _ in range(random.randint(2, 4)):
+                ambient_bubbles.append([base_x + random.uniform(2.0, 8.0), base_y + random.uniform(-2.0, 2.0), random.uniform(0.20, 0.35), "o"])
+            for _ in range(random.randint(1, 2)):
+                ambient_bubbles.append([base_x + random.uniform(4.0, 12.0), base_y + random.uniform(-3.0, 3.0), random.uniform(0.28, 0.45), "."])
+
+        live_ambient = []
+        for b in ambient_bubbles:
+            b[0] -= speed * dt * FRAME_SCALE * 0.25
+            b[1] -= b[2] * dt * FRAME_SCALE * 0.25
+            if b[0] > -2 and b[1] > 0:
+                live_ambient.append(b)
+        ambient_bubbles = live_ambient
+
+        # Crabs
+        _crab_spawn_timer += dt * FRAME_SCALE
+        if _crab_spawn_timer >= _next_crab_spawn:
+            _crab_spawn_timer = 0
+            _next_crab_spawn = random.randint(10, 16) * FRAME_SCALE
+            crabs.append([float(BUFFER_COLS + 2), 0, 0])
+
+        crab_speed = speed * 1.3
+        live_crabs = []
+        for c in crabs:
+            c[0] -= crab_speed * dt * FRAME_SCALE * 0.25
+            c[2] += dt * FRAME_SCALE
+            if c[2] >= 5:
+                c[2] = 0
+                c[1] = 1 - c[1]
+            if c[0] > -crab_width:
+                live_crabs.append(c)
+            cx_c, cy_c = int(c[0]), crab_y
+            px, py = player.position
+            if (px < cx_c + crab_width and px + player.width > cx_c and
+                    py < cy_c + crab_height and py + player.height > cy_c):
+                crab_display = crab_frames[int(c[1])]
+                player_display = player.sprite.display
+                left, right = max(px, cx_c), min(px + player.width, cx_c + crab_width)
+                top, bottom = max(py, cy_c), min(py + player.height, cy_c + crab_height)
+                hit = False
+                for wy in range(top, bottom):
+                    for wx in range(left, right):
+                        if (player_display[wy - py][wx - px] != " " and
+                                crab_display[wy - cy_c][wx - cx_c] != " "):
+                            player.set_dead(True)
+                            is_running = False
+                            hit = True
+                            break
+                    if hit:
+                        break
+        crabs = live_crabs
+
+        _tentacle_anim_timer += dt
+        if _tentacle_anim_timer >= 0.4:
+            _tentacle_frame = 1 - _tentacle_frame
+            _tentacle_anim_timer = 0
+
+        # Coins
+        _coin_spawn_timer += dt * FRAME_SCALE
+        if _coin_spawn_timer >= _next_coin_spawn:
+            _coin_spawn_timer = 0
+            _next_coin_spawn = random.randint(200, 360)
+            tmp_coin = Coin(0.0, 0.0)
+            margin = 2
+            y_lo = HEADER_ROWS + margin
+            y_hi = max(y_lo, GAME_AREA_HEIGHT - tmp_coin.height - margin)
+            spawn_y = float(random.randint(y_lo, y_hi))
+            coins.append(Coin(float(BUFFER_COLS + 2), spawn_y))
+
+        live_coins = []
+        for coin in coins:
+            coin.scroll(speed)
+            cx, cy = coin.position
+            px, py = player.position
+            if (px < cx + coin.width and px + player.width > cx and
+                    py < cy + coin.height and py + player.height > cy):
+                coin.collected = True
+                score += 1
+            if not coin.collected and cx + coin.width > 0:
+                live_coins.append(coin)
+        coins = live_coins
+
+        # Render
+        current_high_score = max(saved_high_score, score)
+        frame_callback(_make_frame("playing", score, current_high_score))
+
+        elapsed = time.perf_counter() - current_frame_time
+        sleep_time = TARGET_FRAME_SECONDS - elapsed
+        if sleep_time > 0:
+            time.sleep(sleep_time)
+
+    # Death animation
+    player.set_dead(True)
+    _death_vy = -25.0
+    _death_y = float(player.position[1])
+    _death_elapsed = 0.0
+    _death_last = time.perf_counter()
+    _final_score = max(saved_high_score, score)
+
+    while _death_elapsed < 1.5 and not stop_event.is_set():
+        _now = time.perf_counter()
+        _dt = min(_now - _death_last, 0.05)
+        _death_last = _now
+        _death_vy += gravity * _dt
+        _death_y += _death_vy * _dt
+        player._position = (player.position[0], int(_death_y))
+        fd = render_frame(
+            player, spawner.obstacles, score=score, high_score=_final_score,
+            bubbles=[], ambient_bubbles=[],
+            crabs=crabs, crab_frames=crab_frames, crab_y=crab_y,
+            tentacle_frame=_tentacle_frame, coins=[],
+        )
+        frame_callback({"type": "frame", "state": "dead", **fd})
+        _death_elapsed += _dt
+        time.sleep(max(0.0, TARGET_FRAME_SECONDS - (time.perf_counter() - _now)))
+
+    saved_high_score = sync_high_score(username, score, saved_high_score)
+    frame_callback({"type": "game_over", "score": score, "high_score": saved_high_score})
+    return score
