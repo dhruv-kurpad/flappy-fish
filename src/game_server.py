@@ -28,7 +28,7 @@ app.add_middleware(
 )
 
 
-# --- Auth / leaderboard HTTP endpoints (proxy to Spring Boot) ---
+# --- Auth / leaderboard HTTP endpoints (via auth.py → flaskapp.py) ---
 
 @app.get("/auth/register")
 def register(name: str = Query(...), pwd: str = Query(...)):

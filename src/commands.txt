@@ -1,0 +1,3 @@
+cd src && source ../.venv/bin/activate && uvicorn game_server:app --port 8765 --reload
+
+cd frontend && npm run dev

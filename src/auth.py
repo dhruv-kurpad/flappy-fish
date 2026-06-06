@@ -1,126 +1,130 @@
 """
-auth.py handles player-related communication between the CLI and the Spring Boot backend.
-Provides helper functions for registering users, logging in, removing users,and retrieving leaderboard data.
+auth.py handles player-related communication between the CLI / game server
+and the Flask API (flaskapp.py) backed by Azure SQL.
 """
 
 import requests
 
-# Base URL for all player-related backend API endpoints.
-BASE_URL = "http://cs506x3a.cs.wisc.edu:8080/api/players"
+# Flask API — must match flaskapp.py (currently port 80).
+BASE_URL = "http://127.0.0.1:80"
 
 
-# Register a user through the backend API and return a status code.
 def register_user(username, password):
+    if not username or not str(username).strip():
+        return {"code": -2}
+    if not password or not str(password).strip():
+        return {"code": -3}
+
     try:
-        response = requests.get(
+        response = requests.post(
             f"{BASE_URL}/register",
-            # Pass the username and password as query parameters.
-            params={"name": username, "pwd": password},
-            # Stop waiting if the backend does not respond within 5 seconds.
+            json={"username": username, "password": password},
             timeout=5,
         )
-        # Raise an exception if the HTTP response indicates an error.
-        response.raise_for_status()
+        if response.status_code == 201:
+            return {"code": 0}
+        if response.status_code == 409:
+            return {"code": -1}
+        if response.status_code == 400:
+            data = response.json()
+            return {"code": data.get("code", -99)}
     except requests.RequestException:
-        # Return a special error code if the backend cannot be reached.
         return {"code": -99}
 
-    # Convert the backend text response into an integer status code.
-    return {"code": int(response.text)}
+    return {"code": -99}
 
 
-# Log in a user through the backend API and return the JSON response.
 def login_user(username, password):
+    if not username or not str(username).strip():
+        return {"code": -2}
+
     try:
         response = requests.get(
             f"{BASE_URL}/login",
-            # Pass the username and password as query parameters.
-            params={"name": username, "pwd": password},
-            # Stop waiting if the backend does not respond within 5 seconds.
+            params={"username": username, "password": password},
             timeout=5,
         )
-        # Raise an exception if the HTTP response indicates an error.
+        if response.status_code == 401:
+            return {"code": -1}
         response.raise_for_status()
-        # Parse the backend response as JSON.
         data = response.json()
     except requests.RequestException:
-        # Return a special error code if the backend cannot be reached.
         return {"code": -99}
     except ValueError:
-        # Return the same error code if the response is not valid JSON.
         return {"code": -99}
 
-    # Return the parsed login result directly.
-    return data
+    return {
+        "code": 0,
+        "username": data.get("username"),
+        "playerId": data.get("id"),
+        "highScore": data.get("high_score", 0),
+    }
 
 
-# Remove a user through the backend API and return a status code.
 def remove_user(username):
     try:
-        response = requests.get(
-            f"{BASE_URL}/remove",
-            # Pass the username as a query parameter.
-            params={"name": username},
-            # Stop waiting if the backend does not respond within 5 seconds.
+        response = requests.delete(
+            f"{BASE_URL}/delete",
+            json={"username": username},
             timeout=5,
         )
-        # Raise an exception if the HTTP response indicates an error.
+        if response.status_code == 404:
+            return {"code": -1}
         response.raise_for_status()
     except requests.RequestException:
-        # Return a special error code if the backend cannot be reached.
         return {"code": -99}
 
-    # Convert the backend text response into an integer status code.
-    return {"code": int(response.text)}
+    return {"code": 0}
 
 
-# Retrieve leaderboard data from the backend API.
 def get_leaderboard():
     try:
-        response = requests.get(
-            f"{BASE_URL}/leaderboard",
-            # Stop waiting if the backend does not respond within 5 seconds.
-            timeout=5,
-        )
-        # Raise an exception if the HTTP response indicates an error.
+        response = requests.get(f"{BASE_URL}/getAllPlayers", timeout=5)
         response.raise_for_status()
-        # Parse the leaderboard response as JSON.
-        data = response.json()
+        raw = response.json()
     except requests.RequestException:
-        # Return a failure result and an empty player list if the backend cannot be reached.
         return {
             "success": False,
-            "message": "Cannot connect to Spring Boot backend.",
-            "players": []
+            "message": "Cannot connect to Flask backend.",
+            "players": [],
         }
     except ValueError:
-        # Return a failure result and an empty player list if the response is not valid JSON.
         return {
             "success": False,
             "message": "Invalid response from backend.",
-            "players": []
+            "players": [],
         }
 
-    # Return the leaderboard data in a structured result dictionary.
+    players = [
+        {
+            "username": row.get("username"),
+            "highScore": row.get("high_score", 0),
+        }
+        for row in raw
+        if row.get("username")
+    ]
+    players.sort(key=lambda p: p["highScore"], reverse=True)
+
     return {
         "success": True,
         "message": "Leaderboard loaded successfully.",
-        "players": data
+        "players": players,
     }
 
-# Update a player's high score with the backend API
+
 def update_score(username, score):
     try:
-        response = requests.get(
+        response = requests.put(
             f"{BASE_URL}/updateScore",
-            # Pass the username and new score as query parameters.
-            params={"name": username, "score": score},
-            #Stop waiting if no response after 5 seconds
+            json={"username": username, "score": score},
             timeout=5,
         )
+        if response.status_code == 404:
+            return {"code": -1}
         response.raise_for_status()
-    #Code if backend cannot be reached
+        data = response.json()
+        return {"code": data.get("code", 0)}
     except requests.RequestException:
         return {"code": -99}
-    # Convert the backend text response into an integer status code.
-    return {"code": int(response.text)}
+    except ValueError:
+        return {"code": -99}
