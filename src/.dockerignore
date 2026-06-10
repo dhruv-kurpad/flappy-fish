@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.env
+profiles
+*.prof
+main/
+test.py
+flaskapp.py
+fastapip.py
+populate.py
+main.py

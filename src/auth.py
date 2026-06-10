@@ -3,10 +3,16 @@ auth.py handles player-related communication between the CLI / game server
 and the Flask API (flaskapp.py) backed by Azure SQL.
 """
 
-import requests
+import os
+from pathlib import Path
 
-# Flask API — must match flaskapp.py (currently port 80).
-BASE_URL = "http://127.0.0.1:80"
+import requests
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
+
+# Flask API — default matches flaskapp_pool.py on port 80.
+BASE_URL = (os.getenv("BASE_URL"))
 
 
 def register_user(username, password):
@@ -39,9 +45,9 @@ def login_user(username, password):
         return {"code": -2}
 
     try:
-        response = requests.get(
+        response = requests.post(
             f"{BASE_URL}/login",
-            params={"username": username, "password": password},
+            json={"username": username, "password": password},
             timeout=5,
         )
         if response.status_code == 401:

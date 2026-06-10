@@ -1,4 +1,5 @@
 import cProfile
+import os
 import pstats
 from pathlib import Path
 
@@ -11,7 +12,7 @@ app = Flask(__name__)
 PROFILE_DIR = Path(__file__).resolve().parent.parent / "profiles"
 PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
-
+'''
 @app.before_request
 def start_profiler():
     g.profiler = cProfile.Profile()
@@ -24,7 +25,7 @@ def stop_profiler(response):
     filename = f"profiles/{request.endpoint}.prof"
     g.profiler.dump_stats(filename)
     return response
-
+'''
 
 _CONNECTION_STRING = (
     "Driver={ODBC Driver 18 for SQL Server};"
@@ -78,39 +79,51 @@ def get_db():
 
 @app.route("/getAllPlayers", methods=["GET"])
 def get_all_players():
+    conn = None
     try:
         conn = get_db()
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM dbo.players")
         rows = cursor.fetchall()
         players = [row_to_dict(cursor, row) for row in rows]
-        conn.close()
         return jsonify(players)
     except pyodbc.Error as e:
         return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
 
-@app.route("/login", methods=["GET"])
+
+@app.route("/login", methods=["POST"])
 def login():
-    username = request.args.get("username")
-    password = request.args.get("password")
+    data = request.get_json(silent=True) or {}
+    username = data.get("username")
+    password = data.get("password")
 
-    conn = get_db()
-    cursor = conn.cursor()
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        row = cursor.execute(
+            "SELECT * FROM dbo.players WHERE username = ? AND password = ?",
+            (username, password),
+        ).fetchone()
 
-    row = cursor.execute(
-        "SELECT * FROM dbo.players WHERE username = ? AND password = ?",
-        (username, password),
-    ).fetchone()
+        if row is None:
+            return jsonify({"error": "Invalid username or password"}), 401
 
-    if row is None:
-        conn.close()
-        return jsonify({"error": "Invalid username or password"}), 401
+        result = public_player(row_to_dict(cursor, row))
+        return jsonify(result), 200
+    except pyodbc.Error as e:
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
 
-    result = public_player(row_to_dict(cursor, row))
-    conn.close()
-    return jsonify(result), 200
 
 @app.route("/register", methods=["POST"])
 def register():
@@ -123,6 +136,7 @@ def register():
     if not password or not str(password).strip():
         return jsonify({"code": -3, "error": "Password cannot be empty."}), 400
 
+    conn = None
     try:
         conn = get_db()
         cursor = conn.cursor()
@@ -131,44 +145,68 @@ def register():
             (username, password),
         )
         conn.commit()
-        conn.close()
         return jsonify({"message": "Player added successfully"}), 201
     except pyodbc.IntegrityError:
         return jsonify({"error": "Username already taken"}), 409
     except pyodbc.Error as e:
         return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
+
 
 @app.route("/delete", methods=["DELETE"])
 def delete():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     username = data.get("username")
 
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM dbo.players WHERE username = ?", (username,))
-    conn.commit()
-    conn.close()
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM dbo.players WHERE username = ?", (username,))
+        conn.commit()
+        return jsonify({"message": f"Deleted user {username}"}), 200
+    except pyodbc.Error as e:
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
 
-    return jsonify({"message": f"Deleted user {username}"}), 200
+
 @app.route("/updateScore", methods=["PUT"])
 def update_score():
-    data = request.get_json()
+    data = request.get_json(silent=True) or {}
     username = data.get("username")
     score = data.get("score")
 
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE dbo.players SET high_score = ? WHERE username = ?",
-        (score, username)
-    )
-    conn.commit()
-    conn.close()
-
-    return jsonify({"message": f"Updated score for {username} to {score}"}), 200
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE dbo.players SET high_score = ? WHERE username = ?",
+            (score, username),
+        )
+        conn.commit()
+        return jsonify({"message": f"Updated score for {username} to {score}"}), 200
+    except pyodbc.Error as e:
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
 
 @app.route('/')
 def hello_world():
     return 'Hello, World!'
 
-app.run(host='0.0.0.0', port=80)
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", "80"))
+    app.run(host="0.0.0.0", port=port)

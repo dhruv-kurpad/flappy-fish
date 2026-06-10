@@ -1,0 +1,21 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir \
+    "fastapi>=0.111.0" \
+    "uvicorn[standard]>=0.29.0" \
+    "requests>=2.32.0" \
+    "python-dotenv>=1.0.0" \
+    "blessed>=0.6.0" \
+    "colorama>=0.4.6"
+
+COPY game_server.py auth.py game_logic.py display.py display_buffer.py ./
+COPY gameObjects ./gameObjects
+COPY assets ./assets
+
+ENV PORT=8765
+EXPOSE 8765
+
+CMD ["uvicorn", "game_server:app", "--host", "0.0.0.0", "--port", "8765"]
