@@ -1,6 +1,7 @@
-# Flask DB API (flaskapp_pool.py)
-# Build:  docker build -f Dockerfile.web -t web-server ./src
-# Run:    docker run -p 5000:5000 web-server
+# Build context must be ./src (same as docker-compose):
+#   docker build -f Dockerfile.web -t flask-api .
+# From project root:
+#   docker build -f src/Dockerfile.web -t flask-api ./src
 
 FROM python:3.12-bookworm
 

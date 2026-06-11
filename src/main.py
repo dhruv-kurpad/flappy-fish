@@ -692,6 +692,11 @@ def handle_register_code(code, username):
         _typewriter("Error: Username cannot be empty.", color=R)
     elif code == -3:
         _typewriter("Error: Password cannot be empty.", color=R)
+    elif code == -99:
+        _typewriter(
+            "Databass is asleep, float around while the guppys wake him up",
+            color=R,
+        )
     else:
         _typewriter("Error: Cannot connect to backend.", color=R)
 
@@ -703,6 +708,11 @@ def handle_login_code(code):
         _typewriter("Error: Username not found.", color=R)
     elif code == -2:
         _typewriter("Error: Incorrect password.", color=R)
+    elif code == -99:
+        _typewriter(
+            "Databass is asleep, float around while the guppys wake him up",
+            color=R,
+        )
     else:
         _typewriter("Error: Cannot connect to backend.", color=R)
 

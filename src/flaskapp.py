@@ -100,26 +100,33 @@ def get_all_players():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route("/login", methods=["GET"])
+@app.route("/login", methods=["POST"])
 def login():
-    username = request.args.get("username")
-    password = request.args.get("password")
+    data = request.get_json(silent=True) or {}
+    username = data.get("username")
+    password = data.get("password")
 
-    conn = get_db()
-    cursor = conn.cursor()
+    conn = None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        row = cursor.execute(
+            "SELECT * FROM dbo.players WHERE username = ? AND password = ?",
+            (username, password),
+        ).fetchone()
 
-    row = cursor.execute(
-        "SELECT * FROM dbo.players WHERE username = ? AND password = ?",
-        (username, password),
-    ).fetchone()
+        if row is None:
+            return jsonify({"error": "Invalid username or password"}), 401
 
-    if row is None:
-        conn.close()
-        return jsonify({"error": "Invalid username or password"}), 401
-
-    result = public_player(row_to_dict(cursor, row))
-    conn.close()
-    return jsonify(result), 200
+        result = public_player(row_to_dict(cursor, row))
+        return jsonify(result), 200
+    except pyodbc.Error as e:
+        return jsonify({"error": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        if conn is not None:
+            conn.close()
 
 @app.route("/register", methods=["POST"])
 def register():
@@ -180,6 +187,8 @@ def update_score():
 def hello_world():
     return 'Hello, World!'
 
-app.run(host='0.0.0.0', port=80)
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", "5050"))
+    app.run(host="0.0.0.0", port=port)
 
 

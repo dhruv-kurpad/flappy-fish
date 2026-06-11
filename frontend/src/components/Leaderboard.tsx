@@ -22,7 +22,7 @@ export function Leaderboard({ onBack }: Props) {
         if (data.success) {
           setPlayers(data.players);
         } else {
-          setError('Could not load leaderboard.');
+          setError(data.message ?? 'Could not load leaderboard.');
         }
       })
       .catch(() => setError('Could not reach server.'))

@@ -8,18 +8,20 @@ interface Props {
   onBack: () => void;
 }
 
+const DB_ASLEEP_MSG = 'Databass is asleep, float around while the guppys wake him up';
+
 const REGISTER_MSGS: Record<number, string> = {
   0: 'Registered successfully!',
   '-1': 'Username already taken.',
   '-2': 'Username cannot be empty.',
   '-3': 'Password cannot be empty.',
-  '-99': 'Cannot reach server.',
+  '-99': DB_ASLEEP_MSG,
 } as unknown as Record<number, string>;
 
 const LOGIN_MSGS: Record<number, string> = {
   '-1': 'Wrong username or password.',
   '-2': 'Username cannot be empty.',
-  '-99': 'Cannot reach server.',
+  '-99': DB_ASLEEP_MSG,
 } as unknown as Record<number, string>;
 
 export function AuthScreen({ initialMode, onSuccess, onBack }: Props) {
@@ -37,7 +39,7 @@ export function AuthScreen({ initialMode, onSuccess, onBack }: Props) {
       if (mode === 'register') {
         const res = await api.register(username, password);
         if (res.code !== 0) {
-          setError(REGISTER_MSGS[res.code] ?? `Error code ${res.code}`);
+          setError(res.message ?? REGISTER_MSGS[res.code] ?? `Error code ${res.code}`);
           return;
         }
         // Auto-login after register
@@ -51,7 +53,7 @@ export function AuthScreen({ initialMode, onSuccess, onBack }: Props) {
       } else {
         const res = await api.login(username, password);
         if (res.code !== 0) {
-          setError(LOGIN_MSGS[res.code] ?? `Error code ${res.code}`);
+          setError(res.message ?? LOGIN_MSGS[res.code] ?? `Error code ${res.code}`);
           return;
         }
         onSuccess({ username: res.username!, highScore: res.highScore ?? 0 });

@@ -1,3 +1,13 @@
+# Local dev — terminal game (2 terminals)
+python3 src/flaskapp.py
+python3 src/main.py
 cd src && source ../.venv/bin/activate && uvicorn game_server:app --port 8765 --reload
-
 cd frontend && npm run dev
+
+# Docker — all services (from project root)
+docker compose -f docker-compose.web.yml up --build
+
+# Docker — build images for Azure ACR (context ./src or ./frontend, NOT project root)
+docker build -f src/Dockerfile.web -t flask-api ./src
+docker build -f src/Dockerfile.game -t game-server ./src
+docker build -f frontend/Dockerfile.react -t frontend ./frontend

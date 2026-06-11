@@ -1,3 +1,8 @@
+# Build context must be ./src (same as docker-compose):
+#   docker build -f Dockerfile.game -t game-server .
+# From project root:
+#   docker build -f src/Dockerfile.game -t game-server ./src
+
 FROM python:3.12-slim
 
 WORKDIR /app
