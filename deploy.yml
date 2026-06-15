@@ -1,0 +1,67 @@
+name: Deploy FlappyFish
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 1. Log in to Azure using az login with username/password
+      - name: Azure CLI Login
+        run: |
+          az login --service-principal \
+            -u ${{ secrets.AZURE_CLIENT_ID }} \
+            -p ${{ secrets.AZURE_CLIENT_SECRET }} \
+            --tenant ${{ secrets.AZURE_TENANT_ID }}
+
+      # 2. Log in to ACR
+      - name: ACR Login
+        run: |
+          echo ${{ secrets.ACR_PASSWORD }} | docker login ${{ secrets.ACR_LOGIN_SERVER }} \
+            --username ${{ secrets.ACR_USERNAME }} --password-stdin
+
+      # 3. Build & Push Frontend
+      - name: Build & Push Frontend
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/frontend:latest \
+            -f frontend/Dockerfile.react \
+            --push .
+
+      # 4. Build & Push Flask API
+      - name: Build & Push Flask API
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/flask-api:latest \
+            -f src/Dockerfile.web \
+            --push .
+
+      # 5. Build & Push Game Server
+      - name: Build & Push Game Server
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/game-server:latest \
+            -f src/Dockerfile.game \
+            --push .
+
+      # 6. Redeploy ACI using ARM template
+      - name: Deploy to Azure Container Instances
+        run: |
+          az deployment group create \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --template-file azuredeploy.json \
+            --parameters acrServer=${{ secrets.ACR_LOGIN_SERVER }} \
+                         acrUsername=${{ secrets.ACR_USERNAME }} \
+                         acrPassword=${{ secrets.ACR_PASSWORD }} \
+                         sqlUsername=${{ secrets.SQL_USERNAME }} \
+                         sqlPassword=${{ secrets.SQL_PASSWORD }}
