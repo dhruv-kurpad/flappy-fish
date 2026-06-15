@@ -1,0 +1,19 @@
+# Local GitHub Actions / deploy.yml test runner
+#
+# Start shell:
+#   docker compose -f ci-test.yml run --rm github-ci-test
+#
+# Run build-only test (no Azure push):
+#   docker compose -f ci-test.yml run --rm github-ci-test test-github-deploy.sh
+
+services:
+  github-ci-test:
+    build:
+      context: .
+      dockerfile: ci-test.dockerfile
+    volumes:
+      - .:/workspace
+      - /var/run/docker.sock:/var/run/docker.sock
+    working_dir: /workspace
+    stdin_open: true
+    tty: true

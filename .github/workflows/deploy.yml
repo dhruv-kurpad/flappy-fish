@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -14,7 +15,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. Log in to Azure using az login with username/password
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 1. Log in to Azure using service principal
       - name: Azure CLI Login
         run: |
           az login --service-principal \
@@ -28,32 +32,32 @@ jobs:
           echo ${{ secrets.ACR_PASSWORD }} | docker login ${{ secrets.ACR_LOGIN_SERVER }} \
             --username ${{ secrets.ACR_USERNAME }} --password-stdin
 
-      # 3. Build & Push Frontend
+      # 3. Build & Push Frontend (context must be ./frontend)
       - name: Build & Push Frontend
         run: |
           docker buildx build \
             --platform linux/amd64 \
             -t ${{ secrets.ACR_LOGIN_SERVER }}/frontend:latest \
             -f frontend/Dockerfile.react \
-            --push .
+            --push ./frontend
 
-      # 4. Build & Push Flask API
+      # 4. Build & Push Flask API (context must be ./src)
       - name: Build & Push Flask API
         run: |
           docker buildx build \
             --platform linux/amd64 \
             -t ${{ secrets.ACR_LOGIN_SERVER }}/flask-api:latest \
             -f src/Dockerfile.web \
-            --push .
+            --push ./src
 
-      # 5. Build & Push Game Server
+      # 5. Build & Push Game Server (context must be ./src)
       - name: Build & Push Game Server
         run: |
           docker buildx build \
             --platform linux/amd64 \
             -t ${{ secrets.ACR_LOGIN_SERVER }}/game-server:latest \
             -f src/Dockerfile.game \
-            --push .
+            --push ./src
 
       # 6. Redeploy ACI using ARM template
       - name: Deploy to Azure Container Instances
