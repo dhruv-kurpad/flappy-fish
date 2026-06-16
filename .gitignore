@@ -70,6 +70,7 @@ coverage/
 .env.*
 !.env.example
 !**/.env.example
+deploy.secrets.env
 
 application-local.yml
 application-local.properties

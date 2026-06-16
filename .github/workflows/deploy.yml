@@ -1,4 +1,6 @@
-# deploy.yml
+# deploy.yml — all config from GitHub repository secrets only
+# Settings → Secrets and variables → Actions
+# Comment
 name: Deploy FlappyFish
 
 on:
@@ -18,7 +20,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 1. Log in to Azure using service principal
       - name: Azure CLI Login
         run: |
           az login --service-principal \
@@ -26,13 +27,11 @@ jobs:
             -p ${{ secrets.AZURE_CLIENT_SECRET }} \
             --tenant ${{ secrets.AZURE_TENANT_ID }}
 
-      # 2. Log in to ACR
       - name: ACR Login
         run: |
           echo ${{ secrets.ACR_PASSWORD }} | docker login ${{ secrets.ACR_LOGIN_SERVER }} \
             --username ${{ secrets.ACR_USERNAME }} --password-stdin
 
-      # 3. Build & Push Frontend (context must be ./frontend)
       - name: Build & Push Frontend
         run: |
           docker buildx build \
@@ -41,7 +40,6 @@ jobs:
             -f frontend/Dockerfile.react \
             --push ./frontend
 
-      # 4. Build & Push Flask API (context must be ./src)
       - name: Build & Push Flask API
         run: |
           docker buildx build \
@@ -50,7 +48,6 @@ jobs:
             -f src/Dockerfile.web \
             --push ./src
 
-      # 5. Build & Push Game Server (context must be ./src)
       - name: Build & Push Game Server
         run: |
           docker buildx build \
@@ -59,7 +56,6 @@ jobs:
             -f src/Dockerfile.game \
             --push ./src
 
-      # 6. Redeploy ACI using ARM template
       - name: Deploy to Azure Container Instances
         run: |
           az deployment group create \
