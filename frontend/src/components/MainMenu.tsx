@@ -21,6 +21,10 @@ export function MainMenu({ player, onPlay, onAuth, onLeaderboard, onLogout }: Pr
       `}</pre>
       <pre className="fish-art">{'  ><((((º>'}</pre>
 
+      <p className="menu-notice">
+        Currently on a free database tier, so connection may be slow for the first request.
+      </p>
+
       {player ? (
         <div className="menu-player-info">
           <span className="menu-greeting">Welcome, <strong>{player.username}</strong></span>
@@ -32,10 +36,10 @@ export function MainMenu({ player, onPlay, onAuth, onLeaderboard, onLogout }: Pr
 
       <div className="menu-options">
         <button className="menu-btn primary" onClick={onPlay}>
-          ▶  Play Game
+          Play Game
         </button>
         <button className="menu-btn" onClick={onLeaderboard}>
-          🏆  Leaderboard
+          Leaderboard
         </button>
         {player ? (
           <button className="menu-btn" onClick={onLogout}>

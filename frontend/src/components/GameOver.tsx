@@ -22,17 +22,17 @@ export function GameOver({ score, highScore, onPlayAgain, onMenu }: Props) {
           <span>High Score</span>
           <span className={`gameover-score-val${isNewRecord ? ' new-record' : ''}`}>
             {highScore}
-            {isNewRecord && ' ★ NEW!'}
+            {isNewRecord && ' (new record)'}
           </span>
         </div>
       </div>
 
       <div className="menu-options">
         <button className="menu-btn primary" onClick={onPlayAgain}>
-          ▶  Play Again
+          Play Again
         </button>
         <button className="menu-btn" onClick={onMenu}>
-          ← Menu
+          Menu
         </button>
       </div>
     </div>

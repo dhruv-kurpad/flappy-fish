@@ -7,7 +7,6 @@ interface Props {
 }
 
 const PAGE_SIZE = 10;
-const MEDALS = ['🥇', '🥈', '🥉'];
 
 export function Leaderboard({ onBack }: Props) {
   const [players, setPlayers] = useState<LeaderboardEntry[]>([]);
@@ -39,7 +38,7 @@ export function Leaderboard({ onBack }: Props) {
 
   return (
     <div className="menu-screen leaderboard-screen">
-      <h2 className="lb-title">🏆 Leaderboard</h2>
+      <h2 className="lb-title">Leaderboard</h2>
 
       <input
         className="lb-search"
@@ -67,7 +66,7 @@ export function Leaderboard({ onBack }: Props) {
                 const rank = page_ * PAGE_SIZE + i;
                 return (
                   <tr key={p.username} className={rank < 3 ? 'lb-top' : ''}>
-                    <td>{MEDALS[rank] ?? rank + 1}</td>
+                    <td>{rank + 1}</td>
                     <td>{p.username}</td>
                     <td>{p.highScore}</td>
                   </tr>

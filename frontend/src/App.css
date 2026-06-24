@@ -2,7 +2,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: #000d1a;
+  background: linear-gradient(180deg, #0a1628 0%, #1a2a4a 100%);
   color: #ccddee;
   font-family: 'Courier New', monospace;
   min-height: 100vh;
@@ -56,6 +56,17 @@ body {
 .menu-greeting { font-size: 1rem; }
 .menu-hs { color: #ffd700; font-size: 0.9rem; }
 .menu-hint { color: #888; font-size: 0.85rem; text-align: center; }
+.menu-notice {
+  color: #8899aa;
+  font-size: 0.8rem;
+  text-align: center;
+  line-height: 1.4;
+  max-width: 420px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #334455;
+  border-radius: 4px;
+  background: rgba(0, 20, 40, 0.4);
+}
 
 .menu-options {
   display: flex;
