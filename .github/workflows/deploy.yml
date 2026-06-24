@@ -1,6 +1,5 @@
 # deploy.yml — all config from GitHub repository secrets only
 # Settings → Secrets and variables → Actions
-# Comment
 name: Deploy FlappyFish
 
 on:
@@ -8,6 +7,10 @@ on:
     branches:
       - main
   workflow_dispatch:
+
+env:
+  # Unique tag per commit so ACI must pull new images ( :latest alone is not enough )
+  IMAGE_TAG: ${{ github.sha }}
 
 jobs:
   deploy:
@@ -36,6 +39,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/frontend:${{ env.IMAGE_TAG }} \
             -t ${{ secrets.ACR_LOGIN_SERVER }}/frontend:latest \
             -f frontend/Dockerfile.react \
             --push ./frontend
@@ -44,6 +48,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/flask-api:${{ env.IMAGE_TAG }} \
             -t ${{ secrets.ACR_LOGIN_SERVER }}/flask-api:latest \
             -f src/Dockerfile.web \
             --push ./src
@@ -52,6 +57,7 @@ jobs:
         run: |
           docker buildx build \
             --platform linux/amd64 \
+            -t ${{ secrets.ACR_LOGIN_SERVER }}/game-server:${{ env.IMAGE_TAG }} \
             -t ${{ secrets.ACR_LOGIN_SERVER }}/game-server:latest \
             -f src/Dockerfile.game \
             --push ./src
@@ -65,4 +71,13 @@ jobs:
                          acrUsername=${{ secrets.ACR_USERNAME }} \
                          acrPassword=${{ secrets.ACR_PASSWORD }} \
                          sqlUsername=${{ secrets.SQL_USERNAME }} \
-                         sqlPassword=${{ secrets.SQL_PASSWORD }}
+                         sqlPassword=${{ secrets.SQL_PASSWORD }} \
+                         frontendImage=frontend:${{ env.IMAGE_TAG }} \
+                         flaskApiImage=flask-api:${{ env.IMAGE_TAG }} \
+                         gameServerImage=game-server:${{ env.IMAGE_TAG }}
+
+      - name: Restart container group (pull fresh images)
+        run: |
+          az container restart \
+            --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
+            --name flappy-fish

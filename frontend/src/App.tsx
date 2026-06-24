@@ -41,7 +41,7 @@ function Game({
           Make sure the Python server is running:<br />
           <code>cd src &amp;&amp; uvicorn game_server:app --port 8765</code>
         </p>
-        <button className="menu-btn back-btn" onClick={onQuit}>← Back</button>
+        <button className="menu-btn back-btn" onClick={onQuit}>Back</button>
       </div>
     );
   }

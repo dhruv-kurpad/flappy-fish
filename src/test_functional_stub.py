@@ -394,6 +394,12 @@ class TestRegressionGuards(FunctionalStub):
     def test_flask_login_accepts_post_json_body(self):
         """flaskapp /login expects POST {username, password}, not query params."""
 
+    def test_deploy_uses_unique_image_tag_not_only_latest(self):
+        """
+        deploy.yml tags images with github.sha and passes frontendImage=frontend:<sha>
+        so ACI sees a template change and pulls new layers ( :latest alone leaves old UI ).
+        """
+
     def test_compose_game_server_base_url_points_at_flask_service(self):
         """docker-compose: game-server BASE_URL=http://flask-api:5000 (not localhost)."""
 

@@ -35,18 +35,25 @@ echo "=== ACR login ==="
 echo "$ACR_PASSWORD" | docker login "$ACR_LOGIN_SERVER" \
   --username "$ACR_USERNAME" --password-stdin
 
+IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse HEAD)}"
+
+echo "=== Using image tag: $IMAGE_TAG ==="
+
 echo "=== Build & push frontend ==="
 docker buildx build --platform linux/amd64 \
+  -t "$ACR_LOGIN_SERVER/frontend:$IMAGE_TAG" \
   -t "$ACR_LOGIN_SERVER/frontend:latest" \
   -f frontend/Dockerfile.react --push ./frontend
 
 echo "=== Build & push flask-api ==="
 docker buildx build --platform linux/amd64 \
+  -t "$ACR_LOGIN_SERVER/flask-api:$IMAGE_TAG" \
   -t "$ACR_LOGIN_SERVER/flask-api:latest" \
   -f src/Dockerfile.web --push ./src
 
 echo "=== Build & push game-server ==="
 docker buildx build --platform linux/amd64 \
+  -t "$ACR_LOGIN_SERVER/game-server:$IMAGE_TAG" \
   -t "$ACR_LOGIN_SERVER/game-server:latest" \
   -f src/Dockerfile.game --push ./src
 
@@ -59,7 +66,15 @@ az deployment group create \
     acrUsername="$ACR_USERNAME" \
     acrPassword="$ACR_PASSWORD" \
     sqlUsername="$SQL_USERNAME" \
-    sqlPassword="$SQL_PASSWORD"
+    sqlPassword="$SQL_PASSWORD" \
+    frontendImage="frontend:$IMAGE_TAG" \
+    flaskApiImage="flask-api:$IMAGE_TAG" \
+    gameServerImage="game-server:$IMAGE_TAG"
+
+echo "=== Restart container group ==="
+az container restart \
+  --resource-group "$AZURE_RESOURCE_GROUP" \
+  --name flappy-fish
 
 echo ""
 echo "Deploy complete."

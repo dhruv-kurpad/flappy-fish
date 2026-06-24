@@ -109,7 +109,7 @@ export function AuthScreen({ initialMode, onSuccess, onBack }: Props) {
       </form>
 
       <button className="menu-btn back-btn" onClick={onBack}>
-        ← Back
+        Back
       </button>
     </div>
   );

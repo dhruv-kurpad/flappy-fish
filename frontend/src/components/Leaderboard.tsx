@@ -89,7 +89,7 @@ export function Leaderboard({ onBack }: Props) {
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page_ === 0}
               >
-                ← Prev
+                Prev
               </button>
               <span>
                 Page {page_ + 1} / {totalPages}
@@ -99,7 +99,7 @@ export function Leaderboard({ onBack }: Props) {
                 onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
                 disabled={page_ >= totalPages - 1}
               >
-                Next →
+                Next
               </button>
             </div>
           )}
@@ -107,7 +107,7 @@ export function Leaderboard({ onBack }: Props) {
       )}
 
       <button className="menu-btn back-btn" onClick={onBack}>
-        ← Back
+        Back
       </button>
     </div>
   );
