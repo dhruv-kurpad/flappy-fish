@@ -22,7 +22,7 @@ export function GameOver({ score, highScore, onPlayAgain, onMenu }: Props) {
           <span>High Score</span>
           <span className={`gameover-score-val${isNewRecord ? ' new-record' : ''}`}>
             {highScore}
-            {isNewRecord && ' (new record)'}
+            {isNewRecord && ' (NEW)'}
           </span>
         </div>
       </div>

@@ -1,65 +1,156 @@
-# From Terminal to Browser: Porting a Python Game to React
+> **Part 1 of 3 · Full-Stack Learning Series**
 
-The project began as a Python terminal game built around ASCII rendering, keyboard input, and a simple backend for accounts and high scores. It worked well in its original environment, but I wanted to make it accessible in the browser while using the opportunity to learn React. Rather than rewriting the entire game in JavaScript, I kept the existing Python engine and focused on building a web interface that could interact with it cleanly.
+# From Terminal to Browser
 
-![Terminal version of game](terminal.png)
+*I had a working Python game. I used it as a vehicle to learn React, WebSockets, Docker, and what full-stack development actually feels like outside a tutorial.*
+
+**Stack:** Python · FastAPI · Flask · WebSockets · React · Azure SQL · Docker · Azure Container Instances
 
 ---
 
-## Building the React frontend
+I had a Flappy Bird-style terminal game — accounts, leaderboard, real-time input, roughly a thousand lines in `game_logic.py`. Rather than rewrite it, I set one constraint: keep the Python engine, build a browser interface around it. A working engine meant I could focus on the parts I wanted to do: how a frontend talks to a backend, how services are split, and what it actually takes to ship something.
 
-The React frontend was structured around the existing login, registration, leaderboard, and game screen UI components. The key architectural choice was to avoid duplicating game logic. Instead, the browser connected to a Python service over WebSockets and received pre-computed frames from the server.
+## Choosing a protocol
 
-The Python engine, originally designed for terminal output, was extended with a **headless mode** that produced JSON representations of each frame. React’s responsibility was limited to drawing those frames and communicating with the user.
+I tested REST polling before ruling it out. Even at 100–150ms intervals the game felt choppy — that was worth discovering hands-on. Real-time gameplay needs continuous updates, not periodic snapshots.
 
-```text
-Browser  →  WebSocket  →  Python game loop  →  JSON frames  →  React canvas
+| Approach | Latency | Trade-off | Learning value |
+| --- | --- | --- | --- |
+| Rewrite in JS | ✅ Low | Two codebases to maintain | React only — no cross-language communication |
+| REST polling | ❌ Visible jitter | Simple to implement | REST APIs, but not real-time protocols |
+| **WebSockets** ✅ | ✅ ~30fps | One engine, persistent connection | Full stack: protocols, service design, React, Docker |
+
+The solution was adding `run_game_headless()` to the existing engine — same game loop, each frame serialized as JSON instead of printed to the terminal. React draws the grid and sends back `{"type": "flap"}`. Neither side knows anything about the other's internals.
+
+```python
+# game_logic.py — headless frame payload (simplified)
+def run_game_headless(input_queue, frame_callback, username, stop_event):
+    fd = render_frame(player, obstacles, score, high_score, ...)
+    frame_callback({
+        "type": "frame",
+        "state": "playing",
+        "buffer": fd["buffer"],  # 2D grid of {char, color}
+        "score": score,
+        "high_score": high_score,
+    })
+    # On death → {"type": "game_over", "score": ..., "high_score": ...}
 ```
 
+## FastAPI and Flask — a deliberate split
+
+The app had two distinct jobs: stream game frames in real time, and handle REST calls for login and leaderboards against Azure SQL. I researched both frameworks before writing backend code.
+
+FastAPI is built for async I/O and long-lived WebSocket connections. Flask is the natural fit for short request/response cycles and synchronous drivers like `pyodbc`. Mixing a sync database driver into an async event loop blocks the entire loop while a query runs — so keeping that work in Flask wasn't a workaround, it was the right design.
+
+```
+Game server (FastAPI):        Auth / DB server (Flask):
+• persistent WebSocket        • REST endpoints (login, register, scores)
+• ~30fps frame stream         • synchronous pyodbc → Azure SQL
+• low, predictable latency    • stable, boring request handling
+```
+
+> **What I learned:** Choosing a framework is less about loyalty and more about matching strengths to responsibilities. Researching both upfront let me design around their strengths instead of fighting their weaknesses later.
+
+## The Azure SQL cold-start problem
+
+Everything worked locally. After deploying, login started failing intermittently — no clear pattern, no error message I'd written. I spent time convinced it was a Docker networking issue before finding the actual cause.
+
+Azure SQL Serverless auto-pauses after inactivity. The first connection after a pause triggers a resume that can take 15–20 seconds — long enough to exceed a client timeout. The failure looked random because it only happened after idle periods.
+
+```
+# cold start sequence
+T+0.0s   User submits login form
+T+0.1s   Flask opens DB connection → Azure SQL: "Resuming..."
+T+5.0s   Client timeout (5s) → retry with wake request
+T+15.0s  Still resuming → code -99 returned to frontend
+T+15.0s  User sees: "Databass is asleep, float around..."
+T+20s    Azure SQL: "Resume complete." — next request succeeds
+```
+
+Fix: retry logic with a wake-up request on first failure, longer timeout on the second try, and making the game playable without logging in so a cold DB doesn't block the core experience.
+
+```python
+# auth.py — retry + wake on failure (simplified)
+for attempt, timeout in enumerate((5, 15)):
+    try:
+        response = requests.post(f"{BASE_URL}/login",
+            json={"username": username, "password": password},
+            timeout=timeout)
+        ...
+    except requests.RequestException:
+        if attempt == 0:
+            _wake_database()
+            continue
+        return {"code": -99, "message": DB_ASLEEP_MSG}
+```
+
+> **What I learned:** Cloud services have behavior that doesn't exist locally — auto-pause, cold starts, connection limits, regional latency. Building for the cloud means designing for failure, not just the happy path.
+
+## Docker and Azure Container Instances
+
+I planned to containerize at the end. I should have started there.
+
+**Why ACI over AKS or App Service:**  Azure Kubernetes Services (AKS) introduces cluster management that doesn't make sense at this scale. App Service isn't a natural fit for multi-container setups with custom networking. Azure Container Instances (ACI) bills per CPU-second with no idle cost and no infrastructure to manage — right-sized for a low-traffic project on a student budget.
+
+**Container groups:** Locally, Docker Compose lets containers reach each other by service name. In an ACI container group, all containers share a network namespace and communicate over `localhost` instead. One public IP for the group; internal traffic never leaves the host.
+
+```
+ACI container group (production)
+┌──────────────────────────────────────────────────────┐
+│  React + nginx      FastAPI           Flask           │
+│  :8080 (public)     :8765 localhost   :5001 localhost │
+└──────────────────────────────────────────────────────┘
+Local:      service names (docker-compose)
+Production: localhost (ACI container group)
+```
+
+**Docker build context:** Local builds worked. Building from the project root — as CI does — broke everything.
+
+```bash
+COPY failed: file not found in build context: stat requirements.txt
+# Same Dockerfile. Different build context.
+```
+
+`COPY` resolves paths relative to the build context, not the Dockerfile's location. Fix: explicit contexts per service in Compose.
+
+```yaml
+flask-api:
+  build:
+    context: src
+    dockerfile: Dockerfile.web
+frontend:
+  build:
+    context: frontend
+    dockerfile: Dockerfile.react
+```
+
+A second issue: Alpine Linux doesn't include glibc, which Microsoft's ODBC Driver 18 requires. Switching to `python:3.12-bookworm` fixed it.
+
+```dockerfile
+# ❌ ODBC driver unavailable on Alpine
+FROM python:3.12-alpine
+
+# ✅ Works
+FROM python:3.12-bookworm
+RUN apt-get update && apt-get install -y unixodbc-dev curl gnupg \
+    && ACCEPT_EULA=Y apt-get install -y msodbcsql18
+```
+
+> **What I learned:** Docker build problems and cloud networking problems compound. Treat deployment as part of the design, not an afterthought.
+
 ---
 
-## Splitting the backend
+## Key takeaways
 
-Supporting this required splitting backend responsibilities across two Python services:
-
-| Service | Role |
-|---------|------|
-| **Flask** | REST endpoints for auth and leaderboards → Azure SQL via pyodbc |
-| **FastAPI** | WebSocket game sessions; forwards auth requests to Flask |
-
-Flask is built for synchronous request/response patterns, while FastAPI is built around asynchronous, long-lived connections like WebSockets. Splitting the work between them felt like the right call from an architecture perspective.
+1. **Protocol choice is an architecture choice.** WebSockets for real-time frames; REST for auth and scores. Polling can't fix structural lag no matter how aggressively you tune the interval.
+2. **Match frameworks to responsibilities.** FastAPI for the async game loop; Flask for sync `pyodbc` access to Azure SQL. Researching both upfront made the split feel obvious, not complex.
+3. **Cloud services have personalities.** Azure SQL auto-pause is invisible in local development and very visible in production. Design for failure before you hit it.
+4. **ACI for small multi-container apps.** No cluster overhead, billed per use — but container groups use `localhost`, not Compose service names. Same containers, different addressing.
+5. **Docker build context ≠ Dockerfile location.** Set explicit contexts in Compose. Know your base image's dependencies before optimising for size — Alpine lacks glibc.
 
 ---
 
-## The Azure SQL cold-start surprise
+**Part 2** — profiling Flask with cProfile, connection pooling with DBUtils, and separating steady-state latency from cold-start noise.
+**Part 3** — GitHub Actions, ACR, and the `:latest` tag trap that kept the old UI live after a "successful" deploy.
 
-One of the more unexpected challenges came from **Azure SQL’s serverless auto-pause behavior**. Because the Flask API opened a new database connection for each request, the first request after a period of inactivity consistently failed while the database resumed from a paused state. The delay exceeded the client’s timeout, creating the appearance of random failures.
-
-Adding retry logic and adjusting timeouts resolved the issue, but it highlighted how cloud service behavior can influence application design—even when your code looks fine on paper.
-
----
-
-## Docker lessons
-
-Containerization introduced its own set of lessons:
-
-- **ODBC on Linux** — Building the Python services required Microsoft’s ODBC Driver 18, which meant using Debian-based images rather than Alpine.
-- **Build context vs. Dockerfile paths** — `COPY` instructions resolve paths relative to the **build context**, not the Dockerfile’s location. My initial builds happened to work because I was running them from inside each service’s directory, so the files I referenced were accidentally inside the context—even though the paths in the Dockerfile were technically wrong.
-- **The real break** — The problem only surfaced once I switched to building from the project root for deployment, where the context no longer matched the assumptions in my `COPY` commands. After tracing how Docker interprets paths during a build, I corrected the directory structure and `COPY` targets to align with the actual context.
-
----
-
-## Where it landed
-
-The final system supports both the original terminal interface and a browser-based interface backed by the same Python game engine:
-
-- **React** — UI
-- **FastAPI** — Real-time gameplay
-- **Flask** — Database operations
-- **Azure SQL** — Persistent user data
-
-The project ultimately became an exercise in integrating multiple technologies while preserving the original game logic, and it provided a practical understanding of how real-time systems, web frontends, and cloud services interact.
-
-The browser keeps most of the features from the original game, with one practical tweak: users can play without logging in, which helps when the database is still waking up from a cold start.
-
-![Browser version of game](browser.png)
+*[GitHub](https://github.com/dhruv-kurpad/flappy-fish) · [Live demo](http://flappy-fish.westus2.azurecontainer.io)*
