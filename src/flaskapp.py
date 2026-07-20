@@ -1,5 +1,4 @@
 import cProfile
-import pstats
 from pathlib import Path
 import os
 import pyodbc
@@ -8,7 +7,7 @@ from dbutils.pooled_db import PooledDB
 
 app = Flask(__name__)
 
-PROFILE_DIR = Path(__file__).resolve().parent.parent / "profiles"
+PROFILE_DIR = Path(__file__).resolve().parent.parent / "profile"
 PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -21,8 +20,8 @@ def start_profiler():
 @app.after_request
 def stop_profiler(response):
     g.profiler.disable()
-    filename = f"profiles/{request.endpoint}.prof"
-    g.profiler.dump_stats(filename)
+    endpoint = request.endpoint or "unknown"
+    g.profiler.dump_stats(PROFILE_DIR / f"{endpoint}.prof")
     return response
 
 

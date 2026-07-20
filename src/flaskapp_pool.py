@@ -1,6 +1,5 @@
 import cProfile
 import os
-import pstats
 from pathlib import Path
 
 import pyodbc
@@ -9,10 +8,10 @@ from dbutils.pooled_db import PooledDB
 
 app = Flask(__name__)
 
-PROFILE_DIR = Path(__file__).resolve().parent.parent / "profiles"
+PROFILE_DIR = Path(__file__).resolve().parent.parent / "profile_pool"
 PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
-'''
+
 @app.before_request
 def start_profiler():
     g.profiler = cProfile.Profile()
@@ -22,10 +21,9 @@ def start_profiler():
 @app.after_request
 def stop_profiler(response):
     g.profiler.disable()
-    filename = f"profiles/{request.endpoint}.prof"
-    g.profiler.dump_stats(filename)
+    endpoint = request.endpoint or "unknown"
+    g.profiler.dump_stats(PROFILE_DIR / f"{endpoint}.prof")
     return response
-'''
 
 _CONNECTION_STRING = (
     "Driver={ODBC Driver 18 for SQL Server};"
