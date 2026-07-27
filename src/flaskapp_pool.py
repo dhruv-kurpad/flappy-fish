@@ -11,7 +11,7 @@ app = Flask(__name__)
 PROFILE_DIR = Path(__file__).resolve().parent.parent / "profile_pool"
 PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
-
+'''
 @app.before_request
 def start_profiler():
     g.profiler = cProfile.Profile()
@@ -24,7 +24,7 @@ def stop_profiler(response):
     endpoint = request.endpoint or "unknown"
     g.profiler.dump_stats(PROFILE_DIR / f"{endpoint}.prof")
     return response
-
+'''
 _CONNECTION_STRING = (
     "Driver={ODBC Driver 18 for SQL Server};"
     "Server=tcp:flappy-fish.database.windows.net,1433;"
