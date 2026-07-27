@@ -967,42 +967,61 @@ class TestGameLogicHeadless(unittest.TestCase):
 
     def test_gravity_moves_player_down_without_input(self):
         """Over several frames with no flap, bird_y increases."""
+        import display_buffer
+
         frames = []
+        bird_ys: list[float] = []
         input_q: queue.Queue = queue.Queue()
         stop = threading.Event()
+        real_render = display_buffer.render_frame
+
+        def tracking_render(player, *args, **kwargs):
+            fd = real_render(player, *args, **kwargs)
+            bird_ys.append(float(player.position[1]))
+            return fd
 
         def runner():
             with mock.patch("game_logic.get_high_score", return_value=0), mock.patch(
                 "game_logic.sync_high_score", side_effect=lambda u, s, h: h
-            ), mock.patch("game_logic.time.sleep", return_value=None):
+            ), mock.patch("game_logic.time.sleep", return_value=None), mock.patch(
+                "display_buffer.render_frame", side_effect=tracking_render
+            ):
                 run_game_headless(input_q, frames.append, "grav", stop)
 
         t = threading.Thread(target=runner, daemon=True)
         t.start()
         while not frames:
             time.sleep(0.01)
+        # One flap starts the run; afterward only gravity acts.
         input_q.put({"type": "flap"})
-        deadline = time.time() + 3
-        while time.time() < deadline and len([f for f in frames if f.get("state") == "playing"]) < 10:
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            if any(f.get("type") == "game_over" for f in frames):
+                break
+            if len([f for f in frames if f.get("state") == "playing"]) >= 40:
+                break
             time.sleep(0.01)
         stop.set()
         t.join(timeout=3)
 
-        def min_row(frame):
-            rows = []
-            for r, row in enumerate(frame.get("buffer") or []):
-                for cell in row:
-                    if cell.get("color") == "#FFFF00" and cell.get("char", " ") != " ":
-                        rows.append(r)
-                        break
-            return min(rows) if rows else None
+        playing_count = len([f for f in frames if f.get("state") == "playing"])
+        # bird_ys includes waiting + playing + death frames; use the playing window
+        self.assertGreaterEqual(playing_count, 5)
+        # Drop the initial waiting samples (same Y), keep trajectory after flap
+        unique_prefix = 0
+        while unique_prefix + 1 < len(bird_ys) and bird_ys[unique_prefix + 1] == bird_ys[0]:
+            unique_prefix += 1
+        ys = bird_ys[unique_prefix:]
+        self.assertGreaterEqual(len(ys), 5, f"trajectory too short: {ys!r}")
 
-        playing = [f for f in frames if f.get("state") == "playing"]
-        ys = [min_row(f) for f in playing[:20]]
-        ys = [y for y in ys if y is not None]
-        self.assertTrue(ys)
-        # Without further flaps, y (row) should tend to increase (fall down the screen)
-        self.assertGreaterEqual(ys[-1], ys[0])
+        peak_i = min(range(len(ys)), key=lambda i: ys[i])
+        after_peak = ys[peak_i + 1 :]
+        self.assertTrue(after_peak, "expected samples after jump apex")
+        self.assertGreater(
+            max(after_peak),
+            ys[peak_i],
+            f"bird should fall after apex; ys={ys[:40]!r}",
+        )
 
     def test_flap_from_input_queue_applies_upward_velocity(self):
         """Put {"type": "flap"} on input_queue; bird moves up on next ticks."""
