@@ -1,4 +1,6 @@
-# Stage 1: functional tests. Stage 2: deploy (only if tests pass).
+# Stage 1: unit/mocked tests (validate the commit).
+# Stage 2: deploy (only if Stage 1 passes; main / manual only).
+# Stage 3: live Azure smoke against the URL just deployed.
 # Secrets: Settings → Secrets and variables → Actions
 name: CI/CD FlappyFish
 
@@ -40,7 +42,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r src/requirements.txt
 
-      - name: Run functional tests
+      - name: Run functional tests (unit / mocked; no live Azure)
         working-directory: src
         run: python -m unittest test_functional_stub -v
 
@@ -115,3 +117,44 @@ jobs:
           az container restart \
             --resource-group ${{ secrets.AZURE_RESOURCE_GROUP }} \
             --name flappy-fish
+
+  smoke:
+    name: Stage 3 — Azure smoke
+    needs: deploy
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: src/requirements.txt
+
+      - name: Install system deps for pyodbc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unixodbc-dev
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r src/requirements.txt
+
+      - name: Wait for ACI to come back up
+        run: sleep 45
+
+      - name: Run live Azure E2E smoke tests
+        working-directory: src
+        env:
+          RUN_AZURE_E2E: "1"
+        run: |
+          python -m unittest \
+            test_functional_stub.TestEndToEndLocalStack \
+            test_functional_stub.TestEndToEndAzureDeployment \
+            -v

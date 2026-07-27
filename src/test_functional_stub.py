@@ -5,7 +5,10 @@ Run with:
 
     cd src && python -m unittest test_functional_stub -v
 
-Live E2E defaults to the Azure ACI URL. Optional overrides:
+Live Azure / public-stack E2E is skipped unless:
+    RUN_AZURE_E2E=1
+
+Optional overrides when that flag is set:
     GAME_SERVER_URL=...   # public API base (default: deployed ACI)
     FLASK_URL=...         # direct Flask (local compose only) for Hello World + delete cleanup
     AZURE_APP_URL=...     # override deployed frontend URL
@@ -1218,8 +1221,12 @@ class TestPlayerAndSprites(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# End-to-end — public stack (Azure ACI by default; no local Docker required)
+# End-to-end — public stack (post-deploy Stage 3; skipped unless RUN_AZURE_E2E=1)
 # ---------------------------------------------------------------------------
+
+
+def _azure_e2e_enabled() -> bool:
+    return os.getenv("RUN_AZURE_E2E", "").strip().lower() in ("1", "true", "yes")
 
 
 def _public_api_url() -> str:
@@ -1227,13 +1234,15 @@ def _public_api_url() -> str:
     return os.getenv("GAME_SERVER_URL", DEFAULT_AZURE_APP_URL).rstrip("/")
 
 
+@unittest.skipUnless(_azure_e2e_enabled(), "Set RUN_AZURE_E2E=1 to run post-deploy public E2E")
 class TestEndToEndLocalStack(unittest.TestCase):
     """
     Live checks against the public deployment (same URL browsers use).
 
-    Flask itself is not internet-facing on Azure; auth/DB are exercised through
-    game-server proxies under /auth/ and /leaderboard. Optional FLASK_URL still
-    enables direct cleanup via DELETE /delete when running against local compose.
+    Intended as CI Stage 3 after deploy — not a pre-deploy gate. Flask itself is
+    not internet-facing on Azure; auth/DB are exercised through game-server
+    proxies under /auth/ and /leaderboard. Optional FLASK_URL still enables
+    direct cleanup via DELETE /delete when running against local compose.
     """
 
     def test_flask_reachable_from_host(self):
@@ -1309,8 +1318,9 @@ class TestEndToEndLocalStack(unittest.TestCase):
                     ws.send(json.dumps({"type": "flap"}))
 
 
+@unittest.skipUnless(_azure_e2e_enabled(), "Set RUN_AZURE_E2E=1 to run post-deploy Azure smoke")
 class TestEndToEndAzureDeployment(unittest.TestCase):
-    """Post-deploy checks against the ACI frontend URL."""
+    """Post-deploy checks against the ACI frontend URL (CI Stage 3)."""
 
     def test_frontend_serves_index_html(self):
         """GET deployed URL / returns 200 with React shell."""
