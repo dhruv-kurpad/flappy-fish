@@ -181,6 +181,6 @@ Each worker gets its own pool instance — that's normal for WSGI servers, pools
 
 ---
 
-**Part 3** — GitHub Actions, ACR, and the `:latest` tag trap that kept the old UI live after a "successful" deploy.
+**Previous:** [Part 1 — From Terminal to Browser](blog1.md) · **Next:** [Part 3 — Shipping With Confidence](index.md)
 
 *[GitHub](https://github.com/dhruv-kurpad/flappy-fish) · [Live demo](http://flappy-fish.westus2.azurecontainer.io)*

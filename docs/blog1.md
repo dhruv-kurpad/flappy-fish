@@ -150,7 +150,6 @@ RUN apt-get update && apt-get install -y unixodbc-dev curl gnupg \
 
 ---
 
-**Part 2** — profiling Flask with cProfile, connection pooling with DBUtils, and separating steady-state latency from cold-start noise.
-**Part 3** — GitHub Actions, ACR, and the `:latest` tag trap that kept the old UI live after a "successful" deploy.
+**Next:** [Part 2 — Optimizing the Flask API](blog2.md)
 
 *[GitHub](https://github.com/dhruv-kurpad/flappy-fish) · [Live demo](http://flappy-fish.westus2.azurecontainer.io)*
