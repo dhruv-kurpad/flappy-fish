@@ -1284,11 +1284,38 @@ class TestEndToEndLocalStack(unittest.TestCase):
         """
         gs = _public_api_url()
         flask = os.getenv("FLASK_URL", "").rstrip("/")
-        name = f"pytest_user_{uuid.uuid4().hex[:8]}"
         pwd = "pytest_pass"
-        reg = requests.get(f"{gs}/auth/register", params={"name": name, "pwd": pwd}, timeout=90)
-        self.assertEqual(reg.status_code, 200)
-        self.assertEqual(reg.json().get("code"), 0, reg.json())
+        name = None
+        last_reg = None
+
+        # Full uuid avoids cross-run collisions. Retry a few names in case auth's
+        # wake/retry path registers successfully then times out and sees 409 (-1).
+        for _ in range(3):
+            candidate = f"pytest_user_{uuid.uuid4().hex}"
+            last_reg = requests.get(
+                f"{gs}/auth/register",
+                params={"name": candidate, "pwd": pwd},
+                timeout=90,
+            )
+            self.assertEqual(last_reg.status_code, 200, last_reg.text)
+            code = last_reg.json().get("code")
+            if code == 0:
+                name = candidate
+                break
+            if code == -1:
+                # Username taken: either a rare collision, or create-then-timeout retry.
+                login_probe = requests.get(
+                    f"{gs}/auth/login",
+                    params={"name": candidate, "pwd": pwd},
+                    timeout=90,
+                )
+                if login_probe.json().get("code") == 0:
+                    name = candidate
+                    break
+                continue
+            self.fail(f"register returned unexpected code: {last_reg.json()}")
+
+        self.assertIsNotNone(name, f"could not register a unique user: {last_reg and last_reg.json()}")
         login = requests.get(f"{gs}/auth/login", params={"name": name, "pwd": pwd}, timeout=90)
         self.assertEqual(login.json().get("code"), 0, login.json())
         board = requests.get(f"{gs}/leaderboard", timeout=90).json()
