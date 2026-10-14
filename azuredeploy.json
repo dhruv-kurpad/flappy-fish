@@ -64,7 +64,7 @@
       "type": "string",
       "defaultValue": "tcp:flappy-fish.database.windows.net,1433",
       "metadata": {
-        "description": "Azure SQL server (for future env-based config in flaskapp_pool.py)."
+        "description": "Azure SQL server (DB_SERVER for flaskapp_pool.py)."
       }
     },
     "sqlDatabase": {
@@ -133,19 +133,19 @@
                   "value": "5000"
                 },
                 {
-                  "name": "SERVER",
+                  "name": "DB_SERVER",
                   "value": "[parameters('sqlServer')]"
                 },
                 {
-                  "name": "DATABASE",
+                  "name": "DB_NAME",
                   "value": "[parameters('sqlDatabase')]"
                 },
                 {
-                  "name": "UID",
+                  "name": "DB_USER",
                   "value": "[parameters('sqlUsername')]"
                 },
                 {
-                  "name": "PWD",
+                  "name": "DB_PASSWORD",
                   "secureValue": "[parameters('sqlPassword')]"
                 }
               ],

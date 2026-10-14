@@ -3,8 +3,11 @@ import os
 from pathlib import Path
 
 import pyodbc
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify, g
 from dbutils.pooled_db import PooledDB
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 app = Flask(__name__)
 
@@ -25,19 +28,20 @@ def stop_profiler(response):
     g.profiler.dump_stats(PROFILE_DIR / f"{endpoint}.prof")
     return response
 '''
-_CONNECTION_STRING = (
-    "Driver={ODBC Driver 18 for SQL Server};"
-    "Server=tcp:flappy-fish.database.windows.net,1433;"
-    "Database=flappy-fish;"
-    "Uid=dkurpad;"
-    "Pwd=FlappyFish67;"
-    "Encrypt=yes;"
-    "TrustServerCertificate=yes;"
-    "Connection Timeout=60;"
-)
+def _connection_string():
+    return (
+        "Driver={ODBC Driver 18 for SQL Server};"
+        f"Server={os.environ['DB_SERVER']};"
+        f"Database={os.environ['DB_NAME']};"
+        f"Uid={os.environ['DB_USER']};"
+        f"Pwd={os.environ['DB_PASSWORD']};"
+        "Encrypt=yes;"
+        "TrustServerCertificate=yes;"
+        "Connection Timeout=60;"
+    )
 
 def _create_connection():
-    return pyodbc.connect(_CONNECTION_STRING, timeout=60)
+    return pyodbc.connect(_connection_string(), timeout=60)
 
 
 _create_connection.dbapi = pyodbc
