@@ -3,6 +3,7 @@ auth.py handles player-related communication between the CLI / game server
 and the Flask API (flaskapp.py) backed by Azure SQL.
 """
 
+import logging
 import os
 from pathlib import Path
 
@@ -13,6 +14,10 @@ load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # Flask API — default matches flaskapp_pool.py on port 80
 BASE_URL = (os.getenv("BASE_URL") or "").rstrip("/")
+
+logger = logging.getLogger(__name__)
+if not BASE_URL:
+    logger.error("BASE_URL is not set; auth calls to the Flask API will fail")
 
 DB_ASLEEP_MSG = "Databass is asleep, float around while the guppys wake him up"
 _WAKE_USER = "tester"
@@ -41,7 +46,13 @@ def _wake_database():
 def _request_failed(response=None, exc=None):
     if exc is not None:
         return True
-    return response is not None and response.status_code >= 500
+    if response is not None and response.status_code >= 500:
+        logger.warning(
+            "Flask API %s returned %s: %s",
+            response.url, response.status_code, response.text[:500],
+        )
+        return True
+    return False
 
 
 def register_user(username, password):
@@ -69,7 +80,8 @@ def register_user(username, password):
                     _wake_database()
                     continue
                 return _db_asleep_response()
-        except requests.RequestException:
+        except requests.RequestException as exc:
+            logger.warning("Flask API request failed: %r", exc)
             if attempt == 0:
                 _wake_database()
                 continue
@@ -104,7 +116,8 @@ def login_user(username, password):
                 "playerId": data.get("id"),
                 "highScore": data.get("high_score", 0),
             }
-        except requests.RequestException:
+        except requests.RequestException as exc:
+            logger.warning("Flask API request failed: %r", exc)
             if attempt == 0:
                 _wake_database()
                 continue
@@ -135,7 +148,8 @@ def remove_user(username):
                 return _db_asleep_response()
             response.raise_for_status()
             return {"code": 0}
-        except requests.RequestException:
+        except requests.RequestException as exc:
+            logger.warning("Flask API request failed: %r", exc)
             if attempt == 0:
                 _wake_database()
                 continue
@@ -160,7 +174,8 @@ def get_leaderboard():
             response.raise_for_status()
             raw = response.json()
             break
-        except requests.RequestException:
+        except requests.RequestException as exc:
+            logger.warning("Flask API request failed: %r", exc)
             if attempt == 0:
                 _wake_database()
                 continue
@@ -220,7 +235,8 @@ def update_score(username, score):
             response.raise_for_status()
             data = response.json()
             return {"code": data.get("code", 0)}
-        except requests.RequestException:
+        except requests.RequestException as exc:
+            logger.warning("Flask API request failed: %r", exc)
             if attempt == 0:
                 _wake_database()
                 continue
