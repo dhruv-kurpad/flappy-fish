@@ -73,16 +73,7 @@ def public_player(row_dict):
 
 
 def get_db():
-    conn = pyodbc.connect(
-            "Driver={ODBC Driver 18 for SQL Server};"
-            "Server=tcp:flappy-fish.database.windows.net,1433;"
-            "Database=flappy-fish;"
-            "Uid=dkurpad;"
-            "Pwd=FlappyFish67;"
-            "Encrypt=yes;"
-            "TrustServerCertificate=no;"
-        )
-    return conn
+    return pyodbc.connect(_CONNECTION_STRING)
 
 @app.route("/getAllPlayers", methods=["GET"])
 def get_all_players():

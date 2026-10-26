@@ -60,30 +60,16 @@
         "description": "React + nginx image — build from frontend/Dockerfile.react (compose service: frontend)."
       }
     },
-    "sqlServer": {
-      "type": "string",
-      "defaultValue": "tcp:flappy-fish.database.windows.net,1433",
-      "metadata": {
-        "description": "Azure SQL server (DB_SERVER for flaskapp_pool.py)."
-      }
-    },
-    "sqlDatabase": {
-      "type": "string",
-      "defaultValue": "flappy-fish",
-      "metadata": {
-        "description": "Azure SQL database name."
-      }
-    },
-    "sqlUsername": {
+    "supabaseUrl": {
       "type": "string",
       "metadata": {
-        "description": "Azure SQL login username."
+        "description": "Supabase project URL (SUPABASE_URL for flaskapp_pool.py)."
       }
     },
-    "sqlPassword": {
+    "supabaseSecretKey": {
       "type": "securestring",
       "metadata": {
-        "description": "Azure SQL login password."
+        "description": "Supabase secret key (SUPABASE_SECRET_KEY for flaskapp_pool.py)."
       }
     }
   },
@@ -133,20 +119,12 @@
                   "value": "5000"
                 },
                 {
-                  "name": "DB_SERVER",
-                  "value": "[parameters('sqlServer')]"
+                  "name": "SUPABASE_URL",
+                  "value": "[parameters('supabaseUrl')]"
                 },
                 {
-                  "name": "DB_NAME",
-                  "value": "[parameters('sqlDatabase')]"
-                },
-                {
-                  "name": "DB_USER",
-                  "value": "[parameters('sqlUsername')]"
-                },
-                {
-                  "name": "DB_PASSWORD",
-                  "secureValue": "[parameters('sqlPassword')]"
+                  "name": "SUPABASE_SECRET_KEY",
+                  "secureValue": "[parameters('supabaseSecretKey')]"
                 }
               ],
               "resources": {

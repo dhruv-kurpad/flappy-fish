@@ -1,0 +1,33 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "frontend": {
+      "root": "frontend",
+      "framework": "vite"
+    },
+    "game_server": {
+      "root": "src",
+      "framework": "fastapi",
+      "entrypoint": "game_server:app",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "flask_api",
+          "format": "url",
+          "env": "BASE_URL"
+        }
+      ]
+    },
+    "flask_api": {
+      "root": "src",
+      "framework": "flask",
+      "entrypoint": "flaskapp_pool:app"
+    }
+  },
+  "rewrites": [
+    { "source": "/auth/(.*)", "destination": { "service": "game_server" } },
+    { "source": "/leaderboard", "destination": { "service": "game_server" } },
+    { "source": "/ws/(.*)", "destination": { "service": "game_server" } },
+    { "source": "/(.*)", "destination": { "service": "frontend" } }
+  ]
+}

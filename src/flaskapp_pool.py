@@ -1,20 +1,21 @@
 import cProfile
 import os
+from functools import lru_cache
 from pathlib import Path
 
-import pyodbc
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify, g
-from dbutils.pooled_db import PooledDB
+from postgrest.exceptions import APIError
+from supabase import Client, create_client
 
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 app = Flask(__name__)
 
+'''
 PROFILE_DIR = Path(__file__).resolve().parent.parent / "profile_pool"
 PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
-'''
 @app.before_request
 def start_profiler():
     g.profiler = cProfile.Profile()
@@ -28,41 +29,17 @@ def stop_profiler(response):
     g.profiler.dump_stats(PROFILE_DIR / f"{endpoint}.prof")
     return response
 '''
-def _connection_string():
-    return (
-        "Driver={ODBC Driver 18 for SQL Server};"
-        f"Server={os.environ['DB_SERVER']};"
-        f"Database={os.environ['DB_NAME']};"
-        f"Uid={os.environ['DB_USER']};"
-        f"Pwd={os.environ['DB_PASSWORD']};"
-        "Encrypt=yes;"
-        "TrustServerCertificate=yes;"
-        "Connection Timeout=60;"
+
+PLAYERS_TABLE = "players"
+UNIQUE_VIOLATION = "23505"
+
+
+@lru_cache(maxsize=1)
+def get_db() -> Client:
+    return create_client(
+        os.environ["SUPABASE_URL"],
+        os.environ["SUPABASE_SECRET_KEY"],
     )
-
-def _create_connection():
-    return pyodbc.connect(_connection_string(), timeout=60)
-
-
-_create_connection.dbapi = pyodbc
-
-_pool = PooledDB(
-    creator=_create_connection,
-    failures=(pyodbc.Error,),
-    mincached=0,       # don't connect at import — Azure SQL may be paused
-    maxcached=5,
-    maxconnections=10,
-    blocking=True,
-    ping=1,            # verify connection when taken from pool
-)
-
-
-def row_to_dict(cursor, row):
-    """Convert a pyodbc row tuple to a dict using column names."""
-    if row is None:
-        return None
-    columns = [col[0] for col in cursor.description]
-    return dict(zip(columns, row))
 
 
 def public_player(row_dict):
@@ -76,26 +53,13 @@ def public_player(row_dict):
     }
 
 
-def get_db():
-    return _pool.connection()
-
 @app.route("/getAllPlayers", methods=["GET"])
 def get_all_players():
-    conn = None
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM dbo.players")
-        rows = cursor.fetchall()
-        players = [row_to_dict(cursor, row) for row in rows]
-        return jsonify(players)
-    except pyodbc.Error as e:
-        return jsonify({"error": str(e)}), 500
+        result = get_db().table(PLAYERS_TABLE).select("*").execute()
+        return jsonify(result.data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    finally:
-        if conn is not None:
-            conn.close()
 
 
 @app.route("/login", methods=["POST"])
@@ -104,27 +68,23 @@ def login():
     username = data.get("username")
     password = data.get("password")
 
-    conn = None
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-        row = cursor.execute(
-            "SELECT * FROM dbo.players WHERE username = ? AND password = ?",
-            (username, password),
-        ).fetchone()
+        result = (
+            get_db()
+            .table(PLAYERS_TABLE)
+            .select("*")
+            .eq("username", username)
+            .eq("password", password)
+            .limit(1)
+            .execute()
+        )
 
-        if row is None:
+        if not result.data:
             return jsonify({"error": "Invalid username or password"}), 401
 
-        result = public_player(row_to_dict(cursor, row))
-        return jsonify(result), 200
-    except pyodbc.Error as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify(public_player(result.data[0])), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    finally:
-        if conn is not None:
-            conn.close()
 
 
 @app.route("/register", methods=["POST"])
@@ -138,25 +98,17 @@ def register():
     if not password or not str(password).strip():
         return jsonify({"code": -3, "error": "Password cannot be empty."}), 400
 
-    conn = None
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO dbo.players (username, password) VALUES (?, ?)",
-            (username, password),
-        )
-        conn.commit()
+        get_db().table(PLAYERS_TABLE).insert(
+            {"username": username, "password": password}
+        ).execute()
         return jsonify({"message": "Player added successfully"}), 201
-    except pyodbc.IntegrityError:
-        return jsonify({"error": "Username already taken"}), 409
-    except pyodbc.Error as e:
+    except APIError as e:
+        if getattr(e, "code", None) == UNIQUE_VIOLATION:
+            return jsonify({"error": "Username already taken"}), 409
         return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    finally:
-        if conn is not None:
-            conn.close()
 
 
 @app.route("/delete", methods=["DELETE"])
@@ -164,20 +116,11 @@ def delete():
     data = request.get_json(silent=True) or {}
     username = data.get("username")
 
-    conn = None
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("DELETE FROM dbo.players WHERE username = ?", (username,))
-        conn.commit()
+        get_db().table(PLAYERS_TABLE).delete().eq("username", username).execute()
         return jsonify({"message": f"Deleted user {username}"}), 200
-    except pyodbc.Error as e:
-        return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    finally:
-        if conn is not None:
-            conn.close()
 
 
 @app.route("/updateScore", methods=["PUT"])
@@ -186,23 +129,13 @@ def update_score():
     username = data.get("username")
     score = data.get("score")
 
-    conn = None
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute(
-            "UPDATE dbo.players SET high_score = ? WHERE username = ?",
-            (score, username),
-        )
-        conn.commit()
+        get_db().table(PLAYERS_TABLE).update(
+            {"high_score": score}
+        ).eq("username", username).execute()
         return jsonify({"message": f"Updated score for {username} to {score}"}), 200
-    except pyodbc.Error as e:
-        return jsonify({"error": str(e)}), 500
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    finally:
-        if conn is not None:
-            conn.close()
 
 @app.route('/')
 def hello_world():

@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 # Flask API — default matches flaskapp_pool.py on port 80
-BASE_URL = os.getenv("BASE_URL")
+BASE_URL = (os.getenv("BASE_URL") or "").rstrip("/")
 
 DB_ASLEEP_MSG = "Databass is asleep, float around while the guppys wake him up"
 _WAKE_USER = "tester"

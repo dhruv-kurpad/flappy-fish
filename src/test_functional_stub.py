@@ -28,8 +28,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-import pyodbc
 import requests
+from postgrest.exceptions import APIError
 
 import auth
 from display_buffer import BUFFER_COLS, GAME_AREA_HEIGHT, HEADER_ROWS
@@ -50,28 +50,30 @@ def _azure_app_url() -> str:
 
 
 def _player_row(player_id=1, username="alice", password="secret", high_score=0):
-    return (player_id, username, password, high_score)
+    return {
+        "id": player_id,
+        "username": username,
+        "password": password,
+        "high_score": high_score,
+    }
 
 
-def _cursor_with_row(row=None, rows=None):
-    """Mock cursor supporting execute().fetchone() chaining and fetchall()."""
-    cursor = mock.MagicMock()
-    cursor.description = [
-        ("id", None, None, None, None, None, None),
-        ("username", None, None, None, None, None, None),
-        ("password", None, None, None, None, None, None),
-        ("high_score", None, None, None, None, None, None),
-    ]
-    cursor.fetchone.return_value = row
-    cursor.fetchall.return_value = rows if rows is not None else ([] if row is None else [row])
-    cursor.execute.return_value = cursor
-    return cursor
+def _supabase_query(rows=None, error=None):
+    """Mock Supabase query builder: chained filters return itself; execute() returns rows."""
+    query = mock.MagicMock()
+    for method in ("select", "insert", "update", "delete", "eq", "limit"):
+        getattr(query, method).return_value = query
+    if error is not None:
+        query.execute.side_effect = error
+    else:
+        query.execute.return_value = SimpleNamespace(data=rows if rows is not None else [])
+    return query
 
 
-def _conn_with_cursor(cursor):
-    conn = mock.MagicMock()
-    conn.cursor.return_value = cursor
-    return conn
+def _supabase_client(query):
+    client = mock.MagicMock()
+    client.table.return_value = query
+    return client
 
 
 def _http_response(status_code=200, json_data=None, text=""):
@@ -112,15 +114,15 @@ class TestFlaskApiHealth(unittest.TestCase):
 
     def test_get_all_players_returns_json_array(self):
         """GET /getAllPlayers should return 200 and a JSON list (possibly empty)."""
-        cursor = _cursor_with_row(rows=[])
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        query = _supabase_query(rows=[])
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             resp = self.client.get("/getAllPlayers")
         self.assertEqual(resp.status_code, 200)
         self.assertIsInstance(resp.get_json(), list)
 
     def test_db_connection_failure_returns_500_not_crash(self):
-        """When SQL is unreachable, endpoints return 500 JSON error, not an unhandled exception."""
-        with mock.patch("flaskapp_pool.get_db", side_effect=pyodbc.Error("unreachable")):
+        """When Supabase is unreachable, endpoints return 500 JSON error, not an unhandled exception."""
+        with mock.patch("flaskapp_pool.get_db", side_effect=ConnectionError("unreachable")):
             resp = self.client.get("/getAllPlayers")
         self.assertEqual(resp.status_code, 500)
         body = resp.get_json()
@@ -137,24 +139,23 @@ class TestFlaskApiRegister(unittest.TestCase):
         cls.client = app.test_client()
 
     def test_register_valid_user_returns_201(self):
-        """New username/password → 201 and success message; row exists in dbo.players."""
-        cursor = _cursor_with_row()
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        """New username/password → 201 and success message; row inserted into players."""
+        query = _supabase_query()
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             resp = self.client.post(
                 "/register",
                 json={"username": "newbie", "password": "pw123"},
             )
         self.assertEqual(resp.status_code, 201)
         self.assertIn("successfully", resp.get_json()["message"].lower())
-        args = cursor.execute.call_args[0]
-        self.assertIn("INSERT", args[0])
-        self.assertEqual(args[1], ("newbie", "pw123"))
+        query.insert.assert_called_once_with({"username": "newbie", "password": "pw123"})
 
     def test_register_duplicate_username_returns_409(self):
         """Second register with same username → 409 'Username already taken'."""
-        cursor = _cursor_with_row()
-        cursor.execute.side_effect = pyodbc.IntegrityError("duplicate")
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        query = _supabase_query(
+            error=APIError({"code": "23505", "message": "duplicate key value violates unique constraint"})
+        )
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             resp = self.client.post(
                 "/register",
                 json={"username": "taken", "password": "pw"},
@@ -182,8 +183,8 @@ class TestFlaskApiRegister(unittest.TestCase):
 
     def test_register_does_not_return_password_in_response(self):
         """Response body must never include the plaintext password field."""
-        cursor = _cursor_with_row()
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        query = _supabase_query()
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             resp = self.client.post(
                 "/register",
                 json={"username": "safe", "password": "topsecret"},
@@ -204,8 +205,8 @@ class TestFlaskApiLogin(unittest.TestCase):
 
     def test_login_valid_credentials_returns_200_with_public_player(self):
         """Correct username/password → 200 JSON with id, username, high_score (no password)."""
-        cursor = _cursor_with_row(row=_player_row(7, "alice", "secret", 42))
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        query = _supabase_query(rows=[_player_row(7, "alice", "secret", 42)])
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             resp = self.client.post(
                 "/login",
                 json={"username": "alice", "password": "secret"},
@@ -219,8 +220,8 @@ class TestFlaskApiLogin(unittest.TestCase):
 
     def test_login_wrong_password_returns_401(self):
         """Known username, wrong password → 401 'Invalid username or password'."""
-        cursor = _cursor_with_row(row=None)
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        query = _supabase_query(rows=[])
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             resp = self.client.post(
                 "/login",
                 json={"username": "alice", "password": "wrong"},
@@ -230,8 +231,8 @@ class TestFlaskApiLogin(unittest.TestCase):
 
     def test_login_unknown_user_returns_401(self):
         """Unknown username → 401 (same error shape as wrong password)."""
-        cursor = _cursor_with_row(row=None)
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        query = _supabase_query(rows=[])
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             resp = self.client.post(
                 "/login",
                 json={"username": "ghost", "password": "x"},
@@ -251,32 +252,31 @@ class TestFlaskApiUpdateScore(unittest.TestCase):
 
     def test_update_score_sets_high_score_in_database(self):
         """PUT with username + score → 200; subsequent login/getAllPlayers reflects new high_score."""
-        cursor = _cursor_with_row()
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        query = _supabase_query()
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             resp = self.client.put(
                 "/updateScore",
                 json={"username": "alice", "score": 99},
             )
         self.assertEqual(resp.status_code, 200)
-        sql, params = cursor.execute.call_args[0]
-        self.assertIn("UPDATE", sql)
-        self.assertEqual(params, (99, "alice"))
+        query.update.assert_called_once_with({"high_score": 99})
+        query.eq.assert_called_once_with("username", "alice")
 
         # Simulate follow-up getAllPlayers reflecting the new score
-        cursor2 = _cursor_with_row(rows=[_player_row(1, "alice", "pw", 99)])
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor2)):
+        query2 = _supabase_query(rows=[_player_row(1, "alice", "pw", 99)])
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query2)):
             listing = self.client.get("/getAllPlayers").get_json()
         self.assertEqual(listing[0]["high_score"], 99)
 
     def test_update_score_for_unknown_user(self):
         """Document expected behavior when username does not exist (currently may still return 200)."""
-        cursor = _cursor_with_row()
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        query = _supabase_query()
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             resp = self.client.put(
                 "/updateScore",
                 json={"username": "does_not_exist", "score": 10},
             )
-        # Flask always returns 200 on successful SQL even if 0 rows updated.
+        # Flask always returns 200 on a successful update even if 0 rows matched.
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Updated score", resp.get_json()["message"])
 
@@ -292,14 +292,15 @@ class TestFlaskApiDelete(unittest.TestCase):
 
     def test_delete_existing_user_returns_200(self):
         """DELETE with valid username removes row; login afterward fails."""
-        cursor = _cursor_with_row()
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        query = _supabase_query()
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             resp = self.client.delete("/delete", json={"username": "alice"})
         self.assertEqual(resp.status_code, 200)
         self.assertIn("Deleted", resp.get_json()["message"])
+        query.eq.assert_called_once_with("username", "alice")
 
-        login_cursor = _cursor_with_row(row=None)
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(login_cursor)):
+        login_query = _supabase_query(rows=[])
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(login_query)):
             login = self.client.post(
                 "/login",
                 json={"username": "alice", "password": "pw"},
@@ -308,8 +309,8 @@ class TestFlaskApiDelete(unittest.TestCase):
 
     def test_delete_is_idempotent_or_returns_clear_error(self):
         """Deleting twice should not corrupt state (define expected status code)."""
-        cursor = _cursor_with_row()
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        query = _supabase_query()
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             first = self.client.delete("/delete", json={"username": "ghost"})
             second = self.client.delete("/delete", json={"username": "ghost"})
         # Current Flask behavior: both succeed with 200 (no rowcount check).
@@ -1425,8 +1426,8 @@ class TestRegressionGuards(unittest.TestCase):
         """flaskapp /login expects POST {username, password}, not query params."""
         from flaskapp_pool import app
 
-        cursor = _cursor_with_row(row=_player_row())
-        with mock.patch("flaskapp_pool.get_db", return_value=_conn_with_cursor(cursor)):
+        query = _supabase_query(rows=[_player_row()])
+        with mock.patch("flaskapp_pool.get_db", return_value=_supabase_client(query)):
             resp = app.test_client().post(
                 "/login",
                 json={"username": "alice", "password": "secret"},
