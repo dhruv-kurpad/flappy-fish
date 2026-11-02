@@ -13,13 +13,57 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
+import logging
+import math
+import time
+
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 import auth
 from game_logic import run_game_headless
 
+logger = logging.getLogger(__name__)
+
+
+def client_ip(request: Request) -> str:
+    """Real client IP. Behind Vercel's proxy request.client is the proxy, so
+    prefer the first X-Forwarded-For entry, then X-Real-IP."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else "unknown"
+
+
+# In-memory storage: counters are per serverless instance (best-effort on Vercel).
+limiter = Limiter(key_func=client_ip)
+
 app = FastAPI()
+app.state.limiter = limiter
+
+
+def _on_rate_limited(request: Request, exc: RateLimitExceeded):
+    logger.warning("Rate limit hit: %s %s (%s)", client_ip(request), request.url.path, exc.detail)
+    response = _rate_limit_exceeded_handler(request, exc)
+    # slowapi only adds headers when headers_enabled=True, which would require a
+    # `response` param on every route, so set Retry-After here instead.
+    retry_after = 60
+    try:
+        item, args = request.state.view_rate_limit
+        reset_time, _remaining = limiter.limiter.get_window_stats(item, *args)
+        retry_after = max(1, math.ceil(reset_time - time.time()))
+    except Exception:
+        pass
+    response.headers["Retry-After"] = str(retry_after)
+    return response
+
+
+app.add_exception_handler(RateLimitExceeded, _on_rate_limited)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -29,19 +73,24 @@ app.add_middleware(
 
 
 # --- Auth / leaderboard HTTP endpoints (via auth.py → flaskapp.py) ---
+# Limits are per client IP within a rolling window. /ws/game is not covered
+# (slowapi does not support WebSockets).
 
 @app.get("/auth/register")
-def register(name: str = Query(...), pwd: str = Query(...)):
+@limiter.limit("5/minute")
+def register(request: Request, name: str = Query(...), pwd: str = Query(...)):
     return auth.register_user(name, pwd)
 
 
 @app.get("/auth/login")
-def login(name: str = Query(...), pwd: str = Query(...)):
+@limiter.limit("10/minute")
+def login(request: Request, name: str = Query(...), pwd: str = Query(...)):
     return auth.login_user(name, pwd)
 
 
 @app.get("/leaderboard")
-def leaderboard():
+@limiter.limit("60/minute")
+def leaderboard(request: Request):
     return auth.get_leaderboard()
 
 

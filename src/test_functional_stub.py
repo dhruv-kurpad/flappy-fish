@@ -582,6 +582,101 @@ class TestGameServerHttpLeaderboard(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Game server rate limiting (slowapi) — /auth/login, /auth/register, /leaderboard
+# ---------------------------------------------------------------------------
+
+
+class TestGameServerRateLimiting(unittest.TestCase):
+    """Per-IP rolling-window limits on the public HTTP endpoints."""
+
+    @classmethod
+    def setUpClass(cls):
+        from fastapi.testclient import TestClient
+        import game_server
+
+        cls.game_server = game_server
+        cls.client = TestClient(game_server.app)
+
+    def setUp(self):
+        self.game_server.limiter.reset()
+        patches = [
+            mock.patch.object(self.game_server.auth, "login_user", return_value={"code": 0}),
+            mock.patch.object(self.game_server.auth, "register_user", return_value={"code": 0}),
+            mock.patch.object(
+                self.game_server.auth, "get_leaderboard", return_value={"success": True, "players": []}
+            ),
+        ]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+
+    def _login(self, ip="1.1.1.1"):
+        return self.client.get(
+            "/auth/login?name=a&pwd=b", headers={"X-Forwarded-For": ip}
+        )
+
+    def test_login_allows_ten_then_429(self):
+        """A few failed attempts (typos) are fine; the 11th in a minute is blocked."""
+        for i in range(10):
+            self.assertEqual(self._login().status_code, 200, f"request {i + 1}")
+        blocked = self._login()
+        self.assertEqual(blocked.status_code, 429)
+        self.assertIn("retry-after", {k.lower() for k in blocked.headers})
+
+    def test_register_allows_five_then_429(self):
+        for _ in range(5):
+            r = self.client.get("/auth/register?name=a&pwd=b", headers={"X-Forwarded-For": "2.2.2.2"})
+            self.assertEqual(r.status_code, 200)
+        r = self.client.get("/auth/register?name=a&pwd=b", headers={"X-Forwarded-For": "2.2.2.2"})
+        self.assertEqual(r.status_code, 429)
+
+    def test_leaderboard_allows_sixty_then_429(self):
+        for _ in range(60):
+            r = self.client.get("/leaderboard", headers={"X-Forwarded-For": "3.3.3.3"})
+            self.assertEqual(r.status_code, 200)
+        r = self.client.get("/leaderboard", headers={"X-Forwarded-For": "3.3.3.3"})
+        self.assertEqual(r.status_code, 429)
+
+    def test_different_ips_have_independent_buckets(self):
+        for _ in range(10):
+            self._login("4.4.4.4")
+        self.assertEqual(self._login("4.4.4.4").status_code, 429)
+        self.assertEqual(self._login("5.5.5.5").status_code, 200)
+
+    def test_first_forwarded_entry_is_the_key(self):
+        """Only the first X-Forwarded-For entry (the client) identifies the bucket."""
+        for i in range(10):
+            self._login(f"6.6.6.6, 10.0.0.{i}")
+        self.assertEqual(self._login("6.6.6.6, 10.0.0.99").status_code, 429)
+
+    def test_429_response_keeps_cors_header(self):
+        for _ in range(10):
+            self._login("7.7.7.7")
+        r = self.client.get(
+            "/auth/login?name=a&pwd=b",
+            headers={"X-Forwarded-For": "7.7.7.7", "Origin": "http://example.com"},
+        )
+        self.assertEqual(r.status_code, 429)
+        self.assertEqual(r.headers.get("access-control-allow-origin"), "*")
+
+    def test_websocket_not_rate_limited(self):
+        """Exhausting HTTP limits does not affect /ws/game."""
+        for _ in range(11):
+            self._login("8.8.8.8")
+
+        def fake_run(input_q, frame_cb, username, stop_event):
+            frame_cb({"type": "frame", "state": "waiting", "score": 0, "high_score": 0, "buffer": []})
+            stop_event.wait(5)
+
+        with mock.patch.object(self.game_server, "run_game_headless", side_effect=fake_run):
+            with self.client.websocket_connect(
+                "/ws/game?player_name=x", headers={"X-Forwarded-For": "8.8.8.8"}
+            ) as ws:
+                self.assertEqual(ws.receive_json()["type"], "frame")
+                ws.send_json({"type": "quit"})
+
+
+# ---------------------------------------------------------------------------
 # Game server WebSocket — /ws/game
 # ---------------------------------------------------------------------------
 
